@@ -73,7 +73,8 @@ function normPlace(it, sid) {
   const c = clip(it.c, 80), d = clip(it.d, 1500), p = { id: sid + crypto.randomBytes(4).toString("hex"), n: clip(it.n, 200) || "Unnamed", la: rnd(la), ln: rnd(ln) };
   if (c) p.c = c; if (d) p.d = d; if (Object.keys(f).length) p.f = f; return p;
 }
-const hk = p => crypto.createHash("sha1").update(keyNm(p.n) + "|" + p.la + "|" + p.ln).digest("base64url").slice(0, 8);
+// duplicate = same name, same location AND same description (so two accounts of one customer at one spot are both kept)
+const hk = p => crypto.createHash("sha1").update(keyNm(p.n) + "|" + p.la + "|" + p.ln + "|" + keyNm(p.d)).digest("base64url").slice(0, 8);
 const emptyIdx = n => ({ n: n || "", at: 0, sh: [] });
 const total = x => x.sh.reduce((t, e) => t + e.c, 0);
 const loadIdx = async s => { const x = await s.get("pidx", { type: "json" }); _acc = x && Array.isArray(x.sh) ? x : emptyIdx(); _accAt = Date.now(); return _acc; };

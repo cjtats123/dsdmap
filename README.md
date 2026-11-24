@@ -9,9 +9,9 @@ A small GitHub + Netlify site with **one page: a map for every CEPALCO employee*
 
 ## Putting places on the map
 Sign in as admin (or any user with **Edit**), click **Upload KML**, choose the `.kml` or `.kmz` (Google Earth or Google My Maps export). Nothing has to be typed:
-- Name = placemark name. Category = the KML folder it sits in (or the document name). Description and any extra data fields (My Maps columns) are shown in the pin's popup.
+- Name = placemark name. Category = the KML folder it sits in (or the document name). The six areas (Area 1 (CDO 1), Area 2 (CDO 2), Area 3 (Tagoloan), Area 4 (Phividec/PIEMO), Area 5 (Villanueva), Area 6 (Jasaan)) are always in the area list; a folder named "Area 1" or "Area 1 (CDO1)" is counted as Area 1 (CDO 1). Description and any extra data fields (My Maps columns) are shown in the pin's popup.
 - Only point placemarks are shown. Lines and areas in the file are skipped (the upload tells you how many).
-- You choose **Replace the map** (a backup is kept) or **Add to the map** (duplicates with the same name and location are skipped).
+- You choose **Replace the map** (a backup is kept) or **Add to the map** (identical entries are skipped).
 - Built for big maps: up to 250,000 places (a 71,000-place map from ten My Maps files was tested). Upload the files **one at a time** and choose **Add to the map** for each after the first; a file with a few thousand places takes well under a minute. Users with Edit can also move or remove a single pin.
 - On phones a map with tens of thousands of pins is slower to open; pick an area in the category list to show just that area.
 - `sample-pins.kml` is a fake file for trying it out.
