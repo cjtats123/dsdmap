@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#E8171A">
-    <title>Admin · CEPALCO Collection Monitoring</title>
+    <title>Admin · CEPALCO Map</title>
     <link rel="stylesheet" href="theme.css">
     <script src="auth.js" data-admin></script>
 </head>
@@ -13,8 +13,8 @@
         <div class="wrap">
             <a class="brand" href="dmap.html" title="CEPALCO"><img src="cepalco-logo.png" alt="CEPALCO – Cagayan Electric Power &amp; Light Company, Inc."></a>
             <div class="app-title">
-                <h1>Accounts Mapping</h1>
-                <p>District Services Department - Collection Section &nbsp;|&nbsp; Admin</p>
+                <h1>CEPALCO Map</h1>
+                <p>Cagayan Electric Power &amp; Light Company, Inc. &nbsp;|&nbsp; Admin</p>
             </div>
             <div class="app-user">
                 <div class="u1"><span class="loc">Cagayan de Oro City, Northern Mindanao</span><span id="authSlot"></span></div>
@@ -23,7 +23,7 @@
     </header>
     <nav class="app-nav no-print">
         <div class="wrap">
-            <a class="navtab" href="dmap.html" data-feature="dmap">Accounts Mapping</a>
+            <a class="navtab" href="dmap.html" data-feature="dmap">Map</a>
             <a class="navtab on" href="admin.html" data-admin>Admin</a>
         </div>
     </nav>
@@ -43,7 +43,7 @@
             <p class="sub" style="margin:0 0 12px">Pick who to edit, then tick what they can do on each page. Admin always has full access.</p>
             <select id="who" style="margin-bottom:12px;min-width:240px"></select>
             <table><thead><tr><th>Feature</th><th class="ctr">View</th><th class="ctr">Create</th><th class="ctr">Edit</th><th class="ctr">Delete</th></tr></thead><tbody id="mx"></tbody></table>
-            <p class="sub" style="margin:14px 0 0"><b>Accounts Mapping:</b> View opens the map and the lists. Edit lets the user place, move and remove pins and import pins. All of this is enforced on the server. Only the admin can load the Excel file (Accounts Mapping page, <b>Load Excel</b>).</p>
+            <p class="sub" style="margin:14px 0 0"><b>Map:</b> View opens the map and the list of places. Edit also lets the user upload a KML / KMZ file (<b>Upload KML</b> on the map page) and move or remove pins. All of this is enforced on the server. Tick View for <b>Guest</b> if employees should open the map without an account.</p>
         </section>
         <section class="card pad">
             <h2>My password</h2>
@@ -55,9 +55,9 @@
         </section>
         <section class="card pad">
             <h2>Backups</h2>
-            <p class="sub" style="margin:0 0 10px">A copy of all accounts is saved automatically before every <b>Load Excel</b> and before a restore. The latest 8 are kept.</p>
-            <button type="button" id="bkNow" class="btn" style="margin-bottom:10px">Back up now</button> <button type="button" id="dlx" class="btn" style="margin-bottom:10px" title="Download all accounts as an Excel file">Download Excel</button>
-            <table><thead><tr><th>Saved</th><th>Why</th><th class="ctr">Accounts</th><th></th></tr></thead><tbody id="bkl"></tbody></table>
+            <p class="sub" style="margin:0 0 10px">A copy of all places is saved automatically before every KML upload and before a restore. The latest 8 are kept.</p>
+            <button type="button" id="bkNow" class="btn" style="margin-bottom:10px">Back up now</button>
+            <table><thead><tr><th>Saved</th><th>Why</th><th class="ctr">Places</th><th></th></tr></thead><tbody id="bkl"></tbody></table>
         </section>
         <section class="card pad span-all">
             <h2>Sign-in log</h2>
@@ -66,8 +66,8 @@
         </section>
         <section class="card pad span-all">
             <h2>Change log</h2>
-            <p class="sub" style="margin:0 0 10px">Latest 200 changes to accounts: who, when, what.</p>
-            <div class="tw"><table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Account</th><th>Contract</th><th>Changed (old &rarr; new)</th></tr></thead><tbody id="aul"></tbody></table></div>
+            <p class="sub" style="margin:0 0 10px">Latest 200 changes to the map: who, when, what.</p>
+            <div class="tw"><table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Place</th><th>Category</th><th>Changed (old &rarr; new)</th></tr></thead><tbody id="aul"></tbody></table></div>
         </section>
     </main>
 <script>
@@ -80,7 +80,7 @@ const cur=$('#who').value;$('#who').innerHTML='<option value="guest">Guest</opti
 function mx(){const p=db.perms[$('#who').value]||{};$('#mx').innerHTML=Object.entries(Auth.FEATS).map(([f,n])=>`<tr><td style="font-weight:600">${n}</td>`+Auth.ACTS.map(a=>(Auth.NA[f]||[]).includes(a)?'<td class="ctr" style="color:#bbb">\u2014</td>':`<td class="ctr"><input type="checkbox" data-f="${f}" data-a="${a}" ${p[f]&&p[f][a]?'checked':''}></td>`).join('')+'</tr>').join('')}
 $('#who').onchange=mx;
 $('#mx').onchange=async e=>{const t=e.target,k=$('#who').value,v=t.checked?1:0;const j=await Auth.call('setperm',{k,f:t.dataset.f,x:t.dataset.a,v});if(j.e){t.checked=!v;return msg(j.e,1)}const p=db.perms[k]=db.perms[k]||{};(p[t.dataset.f]=p[t.dataset.f]||{})[t.dataset.a]=v;msg('Permissions saved')};
-$('#nu').onsubmit=async e=>{e.preventDefault();const u=$('#u').value.trim().toLowerCase(),j=await Auth.call('adduser',{u,p:$('#p').value});if(j.e)return msg(j.e,1);e.target.reset();msg('User "'+u+'" created (starts with the same access as guest)');refresh()};
+$('#nu').onsubmit=async e=>{e.preventDefault();const u=$('#u').value.trim().toLowerCase(),j=await Auth.call('adduser',{u,p:$('#p').value});if(j.e)return msg(j.e,1);e.target.reset();msg('User "'+u+'" created (can view the map)');refresh()};
 $('#ul').onclick=async e=>{const b=e.target.closest('button');if(!b)return;const u=b.dataset.u;
 if(b.dataset.a==='pw'){const p=prompt('New password for '+u+' (min 8 characters):');if(p===null)return;const j=await Auth.call('setpw',{u,p});msg(j.e||'Password updated for '+u,!!j.e)}
 else if(confirm('Delete user '+u+'?')){const j=await Auth.call('deluser',{u});msg(j.e||'User deleted',!!j.e);refresh()}};
@@ -89,14 +89,11 @@ refresh();
 $('#cp').onsubmit=async e=>{e.preventDefault();const r=await Auth.chpw($('#cpo').value,$('#cpn').value);if(r===true){e.target.reset();msg('Your password was changed')}else msg(r,1)};
 /* ---- backups ---- */
 const when=t=>new Date(t).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-async function backups(){const j=await Auth.call('backups');if(j.e)return;$('#bkl').innerHTML=j.l.map(b=>`<tr><td>${esc(when(b.t))}</td><td>${esc(b.label||'')}</td><td class="ctr">${b.count}</td><td><button class="lk" data-k="${esc(b.key)}">Restore</button></td></tr>`).join('')||'<tr><td colspan="4">No backups yet. One is made automatically the next time you use Load Excel.</td></tr>'}
+async function backups(){const j=await Auth.call('backups');if(j.e)return;$('#bkl').innerHTML=j.l.map(b=>`<tr><td>${esc(when(b.t))}</td><td>${esc(b.label||'')}</td><td class="ctr">${b.count}</td><td><button class="lk" data-k="${esc(b.key)}">Restore</button></td></tr>`).join('')||'<tr><td colspan="4">No backups yet. One is made automatically the next time you upload a KML.</td></tr>'}
 $('#bkNow').onclick=async()=>{const j=await Auth.call('backup_now');msg(j.e||'Backup saved',!!j.e);backups()};
-/* download every account as an Excel file (same layout and file name as Export to Excel in the Accounts grid; can be loaded again with Load Excel) */
-$('#dlx').onclick=async()=>{msg('Preparing the Excel file\u2026');const j=await Auth.call('getdata');if(j.e||!j.r)return msg(j.e||'Could not read the accounts',1);if(!j.r.length)return msg('There are no accounts to download yet',1);
-try{await downloadAccountsXlsx(j);msg('Excel file downloaded ('+j.r.length+' accounts)')}catch(x){msg(x.message,1)}};
-$('#bkl').onclick=async e=>{const b=e.target.closest('button[data-k]');if(!b)return;if(!confirm('Replace ALL current accounts with this backup? The current list is backed up first, so you can undo this.'))return;const j=await Auth.call('backup_restore',{key:b.dataset.k});msg(j.e||('Restored '+j.count+' accounts'),!!j.e);backups();changes()};
+$('#bkl').onclick=async e=>{const b=e.target.closest('button[data-k]');if(!b)return;if(!confirm('Replace ALL current places with this backup? The current list is backed up first, so you can undo this.'))return;const j=await Auth.call('backup_restore',{key:b.dataset.k});msg(j.e||('Restored '+j.count+' places'),!!j.e);backups();changes()};
 /* ---- change log ---- */
-const AC={add:'Added','edit':'Edited','edit contact':'Edited contact',delete:'Deleted','DN/JO':'DN / JO','load excel':'Load Excel','restore backup':'Restored backup','map pin set':'Map pin set','map pin removed':'Map pin removed','map import':'Map pins imported'};
+const AC={'upload kml (replace)':'Uploaded KML (replaced the map)','upload kml (add)':'Uploaded KML (added places)','map pin moved':'Pin moved','map pin removed':'Place removed','restore backup':'Restored backup'};
 async function changes(){const j=await Auth.call('audit_get');if(j.e)return;$('#aul').innerHTML=j.l.slice(0,200).map(x=>`<tr><td style="white-space:nowrap">${esc(when(x.t))}</td><td>${esc(x.u)}</td><td>${esc(AC[x.a]||x.a)}</td><td>${esc(x.n||'')}</td><td>${esc(x.cn||'')}</td><td>${(x.d||[]).map(d=>esc(d[0])+': '+(d[1]===''?'(blank)':esc(d[1]))+' \u2192 '+(d[2]===''?'(blank)':esc(d[2]))).join('<br>')}</td></tr>`).join('')||'<tr><td colspan="6">No changes recorded yet.</td></tr>'}
 const SE={login:'Signed in',logout:'Signed out',failed:'Failed sign-in',locked:'Locked out (too many tries)'};
 async function signins(){const j=await Auth.call('signin_get');if(j.e)return;$('#sil').innerHTML=j.l.slice(0,200).map(x=>`<tr><td style="white-space:nowrap">${esc(when(x.t))}</td><td>${esc(x.u)}</td><td${x.e==='failed'||x.e==='locked'?' style="color:var(--red-d)"':''}>${esc(SE[x.e]||x.e)}</td><td>${esc(x.ip||'')}</td></tr>`).join('')||'<tr><td colspan="4">No sign-ins recorded yet.</td></tr>'}

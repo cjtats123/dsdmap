@@ -1,14 +1,12 @@
-// CEPALCO API: logins, permissions and the shared Excel data, stored in Netlify Blobs.
+// CEPALCO Map API: logins, permissions and the map places (from an uploaded KML), stored in Netlify Blobs.
 import { getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
 
 const st = () => getStore("cepalco");
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const FEATS = ["dmap"], ACTS = ["view", "create", "update", "delete"];
-// Accounts Mapping: View = see the map; Edit = place / move / remove pins and import pins. Create and Delete do not apply.
+// Map: View = see the map; Edit = upload a KML, move and remove pins. Create and Delete do not apply.
 const NA = { dmap: ["create", "delete"] };
-// Accounts masterlist: same columns, same order as sheet "MONITORING FOR CODE". s=text, n=number, d=date (YYYY-MM-DD), x=number or text
-const COLS = [["CUSTOMER TYPE","s"],["BILLING","s"],["DN/ODAA","s"],["JOB-ORDER","s"],["CLN","s"],["SUB-AREA","s"],["CUSTOMER NAME","s"],["AREA","x"],["RATE SCHED","x"],["CONTRACT NO.","n"],["MONTHS UNPAID","n"],["DUE DATE","d"],["PAYMENT DATE","d"],["REMAINING BALANCE","n"],["SMS","s"],["EMAIL","s"],["FIELD REMARKS","s"],["PHONE NO.","s"],["EMAIL ADDRESS","s"],["Contact Person","s"]];
 const row = v => ({ view: v ? 1 : 0, create: 0, update: 0, delete: 0 });
 // Guests start with NO access. The admin can tick View for Guest on the Admin page if a read-only guest login is wanted.
 const defGuest = () => ({ dmap: row(0) });
@@ -18,7 +16,7 @@ const hash = (p, salt) => crypto.scryptSync(p, salt, 32).toString("hex");
 const mkUser = (u, p, role) => { const salt = crypto.randomBytes(16).toString("hex"); return { u, salt, h: hash(p, salt), role }; };
 
 // Speed: the signing secret never changes, so keep it in memory; users/permissions and the account list are kept for a few seconds
-// (writes always re-read the account list first, so edits never overwrite each other with stale data).
+// (writes always re-read the place list first, so edits never overwrite each other with stale data).
 let _k = null, _db = null, _dbAt = 0, _acc = null, _accAt = 0;
 const FRESH = 5000;
 async function loadDb() {
@@ -58,60 +56,42 @@ async function signlog(s, req, u, ev) {
   } catch { /* the sign-in log must never block a login */ }
 }
 
-// ---- accounts data ----
-const r2 = v => Math.round(v * 100) / 100;
-function coerce(k, t, v) {
-  if (v === undefined || v === null || String(v).trim() === "") return null;
-  if (t === "s") return String(v).trim();
-  if (t === "d") {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v).trim()), d = m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-    if (!d || d.getUTCMonth() !== +m[2] - 1) throw new Error("Invalid date in " + k + " (use YYYY-MM-DD)");
-    return m[0];
-  }
-  const n = typeof v === "number" ? v : Number(String(v).replace(/[\u20B1,\s]/g, ""));
-  if (Number.isFinite(n)) return t === "n" ? r2(n) : n;
-  if (t === "x") return String(v).trim();
-  throw new Error("Invalid number in " + k);
-}
-// REMAINING BALANCE is the only money column: it is typed / loaded as is (no arrears, bill, total or paid columns any more).
-function norm(o, id) {
-  const r = { _id: id };
-  for (const [k, t] of COLS) r[k] = coerce(k, t, o[k]);
-  return r;
-}
+// ---- map places (loaded from a KML file) ----
+// place = { id, n: name, c: category (KML folder), d: description, f: {extra fields}, la, ln }
 const newId = () => crypto.randomBytes(6).toString("hex");
-const loadAcc = async s => { const a = (await s.get("accounts", { type: "json" })) || { n: "", r: [], at: 0 }; _acc = a; _accAt = Date.now(); return a; };
-const readAcc = async s => (_acc && Date.now() - _accAt < FRESH) ? _acc : loadAcc(s);   // read-only views may use the short-lived copy
-const saveAcc = async (s, a) => { a.at = Date.now(); await s.setJSON("accounts", a); _acc = a; _accAt = Date.now(); };
-const canAnyAcc = (me, db) => ["create", "update", "delete"].some(x => can(me, db, "accounts", x));
+const clip = (v, n) => String(v ?? "").replace(/\u0000/g, "").trim().slice(0, n);
+const keyNm = v => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+const rnd = v => Math.round(v * 1e6) / 1e6;
+const okLL = (la, ln) => Number.isFinite(la) && Number.isFinite(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180 && !(la === 0 && ln === 0);
+const MAX_PLACES = 30000;
+function normPlace(it) {
+  const la = Number(it && it.la), ln = Number(it && it.ln); if (!okLL(la, ln)) return null;
+  const f = {}; if (it.f && typeof it.f === "object") for (const [k, v] of Object.entries(it.f).slice(0, 15)) { const kk = clip(k, 40), vv = clip(v, 200); if (kk && vv) f[kk] = vv; }
+  return { id: newId(), n: clip(it.n, 200) || "Unnamed", c: clip(it.c, 80), d: clip(it.d, 1500), f, la: rnd(la), ln: rnd(ln) };
+}
+const pkey = p => keyNm(p.n) + "|" + p.la + "|" + p.ln;
+const loadPlaces = async s => { const a = (await s.get("places", { type: "json" })) || { n: "", r: [], at: 0 }; if (!Array.isArray(a.r)) a.r = []; _acc = a; _accAt = Date.now(); return a; };
+const readPlaces = async s => (_acc && Date.now() - _accAt < FRESH) ? _acc : loadPlaces(s);   // read-only views may use the short-lived copy
+const savePlaces = async (s, a) => { a.at = Date.now(); await s.setJSON("places", a); _acc = a; _accAt = Date.now(); };
 // ---- change log (who changed what) ----
 const AUDIT_MAX = 2000;
 const short = v => v === null || v === undefined ? "" : String(v).slice(0, 60);
-const diff = (o, n) => COLS.map(([k]) => k).filter(k => (o[k] ?? null) !== (n[k] ?? null)).slice(0, 12).map(k => [k, short(o[k]), short(n[k])]);
 async function audit(s, me, act, rec, d) {
   try {
     const l = (await s.get("audit", { type: "json" })) || [];
-    l.push({ t: Date.now(), u: me.u, a: act, id: rec ? rec._id : null, n: rec ? short(rec["CUSTOMER NAME"]) : "", cn: rec ? short(rec["CONTRACT NO."]) : "", d: d || null });
+    l.push({ t: Date.now(), u: me.u, a: act, id: rec ? rec.id : null, n: rec ? short(rec.n) : "", cn: rec ? short(rec.c) : "", d: d || null });
     await s.setJSON("audit", l.slice(-AUDIT_MAX));
   } catch { /* the change log must never block an edit */ }
 }
-// ---- backups of the whole account list (kept before Load Excel and before a restore) ----
+// ---- backups of the whole place list (kept before an upload and before a restore) ----
 const BK_KEEP = 8;
 async function backup(s, label) {
-  const cur = await s.get("accounts", { type: "json" }); if (!cur || !Array.isArray(cur.r) || !cur.r.length) return null;
+  const cur = await s.get("places", { type: "json" }); if (!cur || !Array.isArray(cur.r) || !cur.r.length) return null;
   const idx = (await s.get("backups_idx", { type: "json" })) || [], key = "backup-" + Date.now() + "-" + newId();
   await s.setJSON(key, cur); idx.push({ key, t: Date.now(), label, count: cur.r.length, n: cur.n || "" });
   while (idx.length > BK_KEEP) { const o = idx.shift(); try { await s.delete(o.key); } catch { } }
   await s.setJSON("backups_idx", idx); return key;
 }
-const bad = e => J({ e: e.message || "Invalid data" }, 400);
-
-// ---- Accounts Mapping: pin locations are stored by contract no. + customer name (not by row id), so they survive Load Excel ----
-const keyCn = v => String(v ?? "").trim().replace(/\.0+$/, "");
-const keyNm = v => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
-const geoKey = x => keyCn(x["CONTRACT NO."]) + "|" + keyNm(x["CUSTOMER NAME"]);
-const loadGeo = async s => { const g = (await s.get("geo", { type: "json" })) || {}; g.p = g.p || {}; return g; };
-const okLL = (la, ln) => Number.isFinite(la) && Number.isFinite(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180 && !(la === 0 && ln === 0);
 
 export default async (req) => {
   if (req.method !== "POST") return J({ e: "POST only" }, 405);
@@ -155,66 +135,47 @@ export default async (req) => {
   }
   if (me.must) return J({ e: "Please choose a new password before continuing.", must: 1 }, 403);
 
-  // Full account list: admin only (feeds Admin > Download Excel). Everyone else only ever receives the map data (dmap_get).
-  if (a === "getdata") {
-    if (me.role !== "admin") return J({ e: "Not allowed" }, 403);
-    const d = await readAcc(s);
-    return J({ n: d.n, at: d.at, cols: COLS, r: d.r });
-  }
-  // Accounts Mapping: all accounts (delinquent / partially paid / fully paid / unbilled), plus where each one is pinned. Phone numbers are included for everyone who may open the map.
-  if (a === "dmap_get") {
+  // Map: every place with its category, description and extra fields. Everyone who may open the map receives it.
+  if (a === "map_get") {
     if (!can(me, db, "dmap")) return J({ e: "Not allowed" }, 403);
-    const d = await readAcc(s), g = await loadGeo(s), withPhone = true;
-    // s = status: 0 delinquent (balance left, no payment date), 1 partially paid (balance left and a payment date or "partial" in DN/ODAA), 2 fully paid (no balance and a payment date / PAID in DN/ODAA), 3 unbilled (no balance, nothing paid). Every account is sent; the page splits them into tabs.
-    const nn = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
-    const r = d.r.filter(x => x["CUSTOMER NAME"]).map(x => {
-      const R = nn(x["REMAINING BALANCE"]), dnu = String(x["DN/ODAA"] || "").toUpperCase(), pay = !!x["PAYMENT DATE"], s = R > 0 ? (pay || dnu.includes("PARTIAL") ? 1 : 0) : (R < 0 || pay || dnu.includes("PAID") ? 2 : 3);
-      const p = g.p[geoKey(x)];
-      return { s, pd: x["PAYMENT DATE"] || "", id: x._id, name: x["CUSTOMER NAME"], cn: x["CONTRACT NO."], area: x["AREA"] ?? "", sub: x["SUB-AREA"] || "", type: x["CUSTOMER TYPE"] || "", m: x["MONTHS UNPAID"], d: x["DUE DATE"] || "", b: Math.max(0, R), dn: x["DN/ODAA"] || "", jo: x["JOB-ORDER"] || "", ...(p ? { la: p.la, ln: p.ln } : {}), ...(withPhone ? { p: x["PHONE NO."] || "" } : {}) };
-    });
-    return J({ v: 2, r, at: d.at || 0, canEdit: can(me, db, "dmap", "update") });
+    const d = await readPlaces(s);
+    return J({ v: 3, r: d.r, at: d.at || 0, n: d.n || "", canEdit: can(me, db, "dmap", "update") });
   }
-  // One account ({id, la, ln}; la empty = remove the pin) or a batch from an imported file ({items: [{cn, name, la, ln}]}, matched to accounts by contract no. / name).
-  if (a === "dmap_set") {
-    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to place pins" }, 403);
-    const d = await loadAcc(s), g = await loadGeo(s), t = Date.now();
-    if (b.id) {
-      const x = d.r.find(y => y._id === b.id); if (!x) return J({ e: "Account not found (it may have been deleted)" }, 404);
-      if (b.la === null || b.la === undefined || b.la === "") { delete g.p[geoKey(x)]; await s.setJSON("geo", g); await audit(s, me, "map pin removed", x, null); return J({ ok: 1 }); }
-      const la = Number(b.la), ln = Number(b.ln); if (!okLL(la, ln)) return J({ e: "That is not a valid location" }, 400);
-      g.p[geoKey(x)] = { la: Math.round(la * 1e6) / 1e6, ln: Math.round(ln * 1e6) / 1e6, t, u: me.u };
-      await s.setJSON("geo", g); await audit(s, me, "map pin set", x, null); return J({ ok: 1, la: g.p[geoKey(x)].la, ln: g.p[geoKey(x)].ln });
+  // Upload from a KML: {mode: "replace" | "add", first, last, total, n: file name, items: [{n, c, d, f, la, ln}]}. Sent in chunks (first = first chunk).
+  if (a === "map_put") {
+    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to upload" }, 403);
+    const mode = b.mode === "replace" ? "replace" : "add", items = Array.isArray(b.items) ? b.items.slice(0, 500) : [];
+    let d = await loadPlaces(s), backedUp = false;
+    if (b.first) {
+      backedUp = !!(await backup(s, (mode === "replace" ? "Before replacing the map (" : "Before adding to the map (") + me.u + ")"));   // the old list is kept so a wrong upload can be undone
+      if (mode === "replace") d = { n: clip(b.n, 120) || "upload", r: [], at: 0 }; else d.n = d.n || clip(b.n, 120);
     }
-    const items = Array.isArray(b.items) ? b.items.slice(0, 1000) : [];
-    const byCn = new Map(), byNm = new Map();
-    for (const y of d.r) { const c = keyCn(y["CONTRACT NO."]), n = keyNm(y["CUSTOMER NAME"]); if (c) (byCn.get(c) || byCn.set(c, []).get(c)).push(y); if (n) (byNm.get(n) || byNm.set(n, []).get(n)).push(y); }
-    let n = 0, bad = 0; const miss = [];
+    const seen = new Set(d.r.map(pkey)); let saved = 0, dup = 0, invalid = 0;
     for (const it of items) {
-      const la = Number(it && it.la), ln = Number(it && it.ln); if (!okLL(la, ln)) { bad++; continue; }
-      const nmk = keyNm(it.name);
-      // try the contract number first, then any other long number found in the placemark (alt), then the exact customer name
-      let l = null;
-      for (const c of [it.cn, ...(Array.isArray(it.alt) ? it.alt.slice(0, 6) : [])]) { const h = byCn.get(keyCn(c)); if (h) { l = h; break; } }
-      if (l) { const same = l.filter(y => keyNm(y["CUSTOMER NAME"]) === nmk); if (same.length) l = same; }   // shared contract numbers: prefer the same customer name
-      else { const nm = byNm.get(nmk); if (nm && new Set(nm.map(geoKey)).size === 1) l = nm; }          // no contract number: accept a name that identifies exactly one account
-      if (!l) { if (miss.length < 30) miss.push(String(it.name || it.cn || "?").slice(0, 60)); continue; }
-      for (const k of new Set(l.map(geoKey))) g.p[k] = { la: Math.round(la * 1e6) / 1e6, ln: Math.round(ln * 1e6) / 1e6, t, u: me.u };
-      n++;
+      const p = normPlace(it); if (!p) { invalid++; continue; }
+      if (seen.has(pkey(p))) { dup++; continue; }
+      if (d.r.length >= MAX_PLACES) return J({ e: "The map is limited to " + MAX_PLACES + " places" }, 400);
+      seen.add(pkey(p)); d.r.push(p); saved++;
     }
-    if (n) { await s.setJSON("geo", g); await audit(s, me, "map import", null, [["pins", "", String(n)]]); }
-    return J({ ok: 1, saved: n, invalid: bad, missing: miss });
+    await savePlaces(s, d);
+    if (b.last) await audit(s, me, mode === "replace" ? "upload kml (replace)" : "upload kml (add)", null, [["places", "", String(Number(b.total) || saved)], ["file", "", short(b.n)]]);
+    return J({ ok: 1, saved, dup, invalid, total: d.r.length, backedUp });
+  }
+  // Move a pin ({id, la, ln}) or remove it (map_del {id}).
+  if (a === "map_move") {
+    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to move pins" }, 403);
+    const d = await loadPlaces(s), x = d.r.find(y => y.id === b.id); if (!x) return J({ e: "Place not found (it may have been removed)" }, 404);
+    const la = Number(b.la), ln = Number(b.ln); if (!okLL(la, ln)) return J({ e: "That is not a valid location" }, 400);
+    x.la = rnd(la); x.ln = rnd(ln); await savePlaces(s, d); await audit(s, me, "map pin moved", x, null); return J({ ok: 1, la: x.la, ln: x.ln });
+  }
+  if (a === "map_del") {
+    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to remove pins" }, 403);
+    const d = await loadPlaces(s), x = d.r.find(y => y.id === b.id); if (!x) return J({ e: "Place not found (it may have been removed)" }, 404);
+    d.r = d.r.filter(y => y !== x); await savePlaces(s, d); await audit(s, me, "map pin removed", x, null); return J({ ok: 1 });
   }
   if (me.role !== "admin") return J({ e: "Admin only" }, 403);
   const pw = String(b.p || ""), u = String(b.u || "").trim().toLowerCase();
 
-  if (a === "putdata") {
-    if (!Array.isArray(b.r)) return J({ e: "No rows" }, 400);
-    let r; try { r = b.r.filter(x => x && (x["CUSTOMER NAME"] || x["CONTRACT NO."])).map(x => norm(x, newId())); } catch (e) { return bad(e); }
-    const bk = await backup(s, "Before Load Excel (" + me.u + ")");   // the old list is kept so a wrong upload can be undone
-    await saveAcc(s, { n: String(b.n || "masterlist"), r }); await audit(s, me, "load excel", null, [["rows", "", String(r.length)], ["file", "", short(b.n)]]);
-    await s.delete("rows"); await s.delete("file"); // old formats, no longer used
-    return J({ ok: 1, count: r.length, backedUp: !!bk });
-  }
   if (a === "signin_get") { const l = (await s.get("signins", { type: "json" })) || []; return J({ l: l.slice(-500).reverse() }); }
   if (a === "audit_get") { const l = (await s.get("audit", { type: "json" })) || []; return J({ l: l.slice(-500).reverse() }); }
   if (a === "backups") return J({ l: ((await s.get("backups_idx", { type: "json" })) || []).slice().reverse() });
@@ -223,7 +184,7 @@ export default async (req) => {
     const idx = (await s.get("backups_idx", { type: "json" })) || [], e = idx.find(y => y.key === b.key); if (!e) return J({ e: "Backup not found" }, 404);
     const snap = await s.get(e.key, { type: "json" }); if (!snap || !Array.isArray(snap.r)) return J({ e: "That backup file is missing" }, 404);
     await backup(s, "Before restoring a backup (" + me.u + ")");
-    await saveAcc(s, { n: snap.n || "restored", r: snap.r }); await audit(s, me, "restore backup", null, [["rows", "", String(snap.r.length)], ["from", "", new Date(e.t).toISOString().slice(0, 16)]]);
+    await savePlaces(s, { n: snap.n || "restored", r: snap.r }); await audit(s, me, "restore backup", null, [["rows", "", String(snap.r.length)], ["from", "", new Date(e.t).toISOString().slice(0, 16)]]);
     return J({ ok: 1, count: snap.r.length });
   }
   if (a === "users") return J({ users: db.users.map(({ u, role }) => ({ u, role })), perms: db.perms });
@@ -231,7 +192,7 @@ export default async (req) => {
     if (!/^[a-z0-9._-]{3,20}$/.test(u)) return J({ e: "Username: 3-20 letters, numbers, . _ -" }, 400);
     if (u === "guest" || db.users.some(x => x.u === u)) return J({ e: "That username is taken" }, 400);
     { const m = pwBad(pw, u); if (m) return J({ e: m }, 400); }
-    db.users.push(mkUser(u, pw, "user")); db.perms[u] = JSON.parse(JSON.stringify(db.perms.guest)); await save(); return J({ ok: 1 });
+    db.users.push(mkUser(u, pw, "user")); db.perms[u] = { dmap: row(1) }; await save(); return J({ ok: 1 });
   }
   if (a === "setpw") {
     const x = db.users.find(y => y.u === u); if (!x) return J({ e: "No such user" }, 404);

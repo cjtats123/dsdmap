@@ -1,6 +1,6 @@
-/* CEPALCO login. Users, permissions and data live on the server (/api, Netlify Blobs). */
+/* CEPALCO Map login. Users, permissions and map places live on the server (/api, Netlify Blobs). */
 const Auth=(()=>{
-const S='cep_session',FEATS={dmap:'Accounts Mapping'},NA={dmap:['create','delete']},ACTS=['view','create','update','delete'];
+const S='cep_session',FEATS={dmap:'Map'},NA={dmap:['create','delete']},ACTS=['view','create','update','delete'];
 const cs=document.currentScript,g=(cs&&cs.dataset)||{},guarded=!!(g.guard||g.admin!==undefined);
 if(guarded)document.documentElement.style.visibility='hidden';
 const ses=()=>{try{return JSON.parse(sessionStorage.getItem(S))}catch(e){return null}};
@@ -29,38 +29,11 @@ if(!ok){const m=document.querySelector('main');if(m){m.hidden=true;m.insertAdjac
 /* confirm in the background; reload only if the server says something changed */
 call('me').then(r=>{if(!r.t)return toLogin();const before=JSON.stringify([ses().role,ses().perms]);put(r);if(JSON.stringify([r.role,r.perms])!==before)location.reload()}).catch(()=>{});
 return ok}
-/* Saved accounts -> plain rows keyed by Excel header, dates as Excel serial numbers (what the report page expects from an uploaded workbook). */
-const excelRows=(d,dateFmt)=>d.r.map(x=>{const o={};d.cols.forEach(([k,t])=>{let v=x[k];if(t==='d'&&v&&!dateFmt){const[y,m,dd]=v.split('-').map(Number);v=Date.UTC(y,m-1,dd)/864e5+25569}o[k]=v==null?'':v});return o});
 const ready=guarded?new Promise(r=>document.addEventListener('DOMContentLoaded',()=>guard().then(r))):Promise.resolve(false);
-return{FEATS,NA,ACTS,excelRows,call,can,ses,logout,login,chpw,guest,ready}})();
+return{FEATS,NA,ACTS,call,can,ses,logout,login,chpw,guest,ready}})();
 
 /* helpers shared by every page: load a big library only when it is needed, and wait for typing to pause */
-const LIB={xlsx:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',chart:'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',pdf:'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',exceljs:'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'};
+const LIB={};
 const _libs={};
 const loadLib=u=>_libs[u]||(_libs[u]=new Promise((ok,no)=>{const e=document.createElement('script');e.src=u;e.async=true;e.onload=ok;e.onerror=()=>{delete _libs[u];no(new Error('Could not load a required library. Check your internet connection.'))};document.head.appendChild(e)}));
 const debounce=(f,t=150)=>{let h;return(...a)=>{clearTimeout(h);h=setTimeout(()=>f(...a),t)}};
-
-/* Formatted Excel download of the accounts list (used by the Accounts grid and the Admin page).
-   Same sheet name, same column headings and same order, so Load Excel can read it back. d = {r: records, cols: [[name,type],...]} */
-async function downloadAccountsXlsx(d){
-await loadLib(LIB.exceljs);
-const MONEY=new Set(['REMAINING BALANCE']),INT=new Set(['CONTRACT NO.','MONTHS UNPAID']),WIDE={'FIELD REMARKS':40,'CUSTOMER NAME':34,'EMAIL ADDRESS':32,'Contact Person':24};
-const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('MONITORING FOR CODE',{views:[{state:'frozen',xSplit:7,ySplit:1}]});
-const line={style:'thin',color:{argb:'FFD0D0D0'}},box={top:line,left:line,bottom:line,right:line};
-ws.columns=d.cols.map(([k,t])=>{
-const vals=d.r.slice(0,500).map(x=>x[k]==null?0:String(t==='d'?'00/00/0000':MONEY.has(k)?Number(x[k]).toLocaleString('en-US',{minimumFractionDigits:2}):x[k]).length);
-return{header:k,key:k,width:Math.min(WIDE[k]||26,Math.max(10,k.length+3,...vals)+2)}});
-d.r.forEach(x=>{const row={};d.cols.forEach(([k,t])=>{let v=x[k];if(v==null||v==='')v=null;else if(t==='d'){const[y,m,dd]=v.split('-').map(Number);v=new Date(Date.UTC(y,m-1,dd))}row[k]=v});ws.addRow(row)});
-const hr=ws.getRow(1);hr.height=30;
-hr.eachCell(c=>{c.font={bold:true,color:{argb:'FFFFFFFF'},size:10};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8171A'}};c.alignment={vertical:'middle',horizontal:'center',wrapText:true};c.border=box});
-d.cols.forEach(([k,t],i)=>{const col=ws.getColumn(i+1);
-col.eachCell({includeEmpty:false},(c,r)=>{if(r===1)return;c.border=box;c.font={size:10};
-if(t==='d'){c.numFmt='mm/dd/yyyy';c.alignment={horizontal:'center'}}
-else if(MONEY.has(k)){c.numFmt='#,##0.00';c.alignment={horizontal:'right'}}
-else if(INT.has(k)){c.numFmt='0';c.alignment={horizontal:'center'}}
-else if(k==='FIELD REMARKS')c.alignment={wrapText:true,vertical:'top'}})});
-ws.autoFilter={from:{row:1,column:1},to:{row:1,column:d.cols.length}};
-ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:1'};
-const buf=await wb.xlsx.writeBuffer(),a=document.createElement('a');
-a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-a.download='ACCOUNTS_MASTERLIST_'+new Date().toISOString().slice(0,10)+'.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}

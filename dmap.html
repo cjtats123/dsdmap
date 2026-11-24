@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E8171A">
-<title>Accounts Mapping - CEPALCO</title>
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>CEPALCO Map</title>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
 <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
@@ -17,131 +18,105 @@
 .mg{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;align-items:start}
 @media(max-width:980px){.mg{grid-template-columns:1fr}}
 /* dvh = real visible height on phones (address bar aware); vh line is the fallback */
-#map{height:calc(100vh - 380px);height:calc(100dvh - 380px);min-height:480px;border-radius:12px;border:1px solid var(--line);background:#e9eef2;z-index:0;contain:layout style}
-#lst{max-height:calc(100vh - 380px);max-height:calc(100dvh - 380px);min-height:480px;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#fff;border:1px solid var(--line);border-radius:12px}
+#map{height:calc(100vh - 300px);height:calc(100dvh - 300px);min-height:480px;border-radius:12px;border:1px solid var(--line);background:#e9eef2;z-index:0;contain:layout style}
+#lst{max-height:calc(100vh - 300px);max-height:calc(100dvh - 300px);min-height:480px;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#fff;border:1px solid var(--line);border-radius:12px}
 @media(max-width:980px){#map{height:62vh;height:62dvh;min-height:340px;max-height:640px}#lst{max-height:60vh;max-height:60dvh;min-height:240px}}
 @media(max-width:640px){.bar select,.bar #q{flex:1 1 150px;min-width:0!important}}
 /* off-screen list rows are not laid out or painted until scrolled near */
-.it{padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 84px}
+.it{padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;content-visibility:auto;contain-intrinsic-size:auto 70px}
 @media(hover:hover){.it:hover{background:#fff7f7}}
-.mb{display:inline-block;min-width:22px;text-align:center;padding:1px 7px;border-radius:999px;color:#fff;font-size:11px;font-weight:700}
-.mb.pt{color:#422006}
-.tg{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
-.g-gen{background:var(--warn-t);color:var(--warn)}.g-ok{background:var(--ok-t);color:var(--ok)}.g-tn{background:#E3EEFF;color:#1450A3}.g-no{background:#eee;color:#777}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tb{flex:1 1 150px;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-bottom:3px solid var(--line);border-radius:10px;background:#fff;font:inherit;font-weight:600;cursor:pointer;color:var(--ink)}.tb b{font-variant-numeric:tabular-nums;font-size:12px;padding:1px 8px;border-radius:999px;background:#eee;color:#444}.tb.on{border-bottom-color:var(--c);background:#fafafa}.tb.on b{background:var(--c);color:#fff}@media(hover:hover){.tb:hover{background:#fafafa}}
-.lgd{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mute)}.lgd i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
-#pl{background:#FFF1D1;border:1px solid #E7C56A;border-radius:10px;padding:10px 14px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline;flex:none}
+.lgd{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12px;color:var(--mute);margin-top:10px}
+.lgd button{border:0;background:none;font:inherit;color:inherit;cursor:pointer;padding:2px 4px;border-radius:6px}
+.lgd button.on{background:#f1f1f1;color:var(--ink);font-weight:700}
+@media(hover:hover){.lgd button:hover{background:#f6f6f6}}
+#pl,#up{background:#FFF1D1;border:1px solid #E7C56A;border-radius:10px;padding:10px 14px}
 #um{background:#fff;border:1px solid var(--line);border-left:4px solid var(--red);border-radius:10px;padding:10px 14px;font-size:12.5px}
-/* pins are plain SVG (no CSS filter: filters repaint every pin on every pan/zoom frame and are what made the old map stutter) */
+/* pins are plain SVG (no CSS filter: filters repaint every pin on every pan/zoom frame) */
 .pin{background:none;border:0}.pin svg{display:block;pointer-events:none}
 @media(hover:hover){.pin:hover svg{transform:scale(1.15);transform-origin:50% 100%}}
 .cl{background:none;border:0}
-.mc{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3),0 2px 5px rgba(0,0,0,.35)}
+.mc{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3),0 2px 5px rgba(0,0,0,.35);background:#E8171A}
 .leaflet-container{-webkit-tap-highlight-color:transparent;font:inherit}
 .pp{min-width:210px;font-size:13px}.pp .sub{margin-top:2px}
+.pd{white-space:pre-line;max-height:150px;overflow:auto;margin:6px 0;font-size:12.5px;overflow-wrap:anywhere}
+.pf{border-collapse:collapse;margin:6px 0;font-size:12px;width:100%}.pf td{padding:2px 6px 2px 0;vertical-align:top;overflow-wrap:anywhere}.pf td:first-child{color:var(--mute);white-space:nowrap}
 </style>
 </head>
 <body>
 <header class="app-header no-print"><div class="wrap">
   <a class="brand" href="dmap.html"><img src="cepalco-logo.png" alt="CEPALCO"></a>
-  <div class="app-title"><h1>Accounts Mapping</h1><p>District Services Department - Collection Section</p></div>
-  <div class="app-user"><div class="u1"><span id="authSlot"></span></div><div class="u2"><span id="st">Loading…</span><label data-admin hidden class="btn-load">Load Excel<input type="file" id="f" accept=".xlsx,.xlsm" hidden></label></div></div>
+  <div class="app-title"><h1>CEPALCO Map</h1><p>Cagayan Electric Power &amp; Light Company, Inc.</p></div>
+  <div class="app-user"><div class="u1"><span id="authSlot"></span></div><div class="u2"><span id="st">Loading…</span></div></div>
 </div></header>
 <nav class="app-nav no-print"><div class="wrap">
-  <a class="navtab on" href="dmap.html" data-feature="dmap">Accounts Mapping</a>
+  <a class="navtab on" href="dmap.html" data-feature="dmap">Map</a>
   <a class="navtab" href="admin.html" data-admin hidden>Admin</a>
 </div></nav>
 <main class="wrap stack" style="padding-top:16px;padding-bottom:32px">
-  <div class="kpis" id="kp" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px"></div>
-  <div class="card" style="padding:14px 18px"><div class="tabs" id="tabs"></div><div class="bar">
-    <input id="q" placeholder="Search name / contract / area" style="min-width:230px">
-    <select id="ar"><option value="">All areas</option></select>
-    <select id="ty"><option value="">All customer types</option></select>
-    <select id="mm"><option value="">Any months unpaid</option><option value="1">1 month</option><option value="2">2 months</option><option value="3">3+ months</option></select>
-    <select id="pn"><option value="">Pinned and not pinned</option><option value="y">Pinned only</option><option value="n">Not pinned yet</option></select>
-        <select id="so" title="DN: none, then generated, then delivered. JO: none, then generated, tendered, disconnected. The arrow button reverses the order."><option value="m">Sort: Months unpaid</option><option value="name">Sort: Customer name</option><option value="b">Sort: Balance</option><option value="dn">Sort: DN status</option><option value="jo">Sort: JO status</option></select><button class="btn" id="sd" title="Reverse the order">↓ Desc</button>
+  <div class="card" style="padding:14px 18px"><div class="bar">
+    <input id="q" placeholder="Search name, category or details" style="min-width:230px">
+    <select id="ct"><option value="">All categories</option></select>
     <button class="btn" id="clr">Clear</button><button class="btn" id="fit">Fit all pins</button>
     <span class="grow" style="flex:1"></span>
-    <label class="btn" id="impl" hidden>Import pins<input type="file" id="imp" hidden></label>
-    <button class="btn" id="exp" title="Download the pins shown as a KML file for Google Earth / My Maps">Export KML</button>
+    <label class="btn btn-load" id="impl" hidden>Upload KML<input type="file" id="imp" hidden></label>
+    <button class="btn" id="exp" title="Download the places shown as a KML file for Google Earth / My Maps">Export KML</button>
     <span id="msg" class="font-semibold"></span>
   </div>
-  <div class="lgd" id="lgd" style="margin-top:10px"></div>
+  <div class="lgd" id="lgd"></div>
   </div>
+  <div id="up" hidden><div class="bar"><b id="upt"></b><span class="grow" style="flex:1"></span><button class="btn pri" id="upr">Replace the map</button><button class="btn" id="upa">Add to the map</button><button class="btn" id="upx">Cancel</button></div><div class="sub" id="upn" style="margin-top:6px"></div></div>
   <div id="pl" hidden><div class="bar"><b id="plt"></b><input id="pli" placeholder="8.4772, 124.6460  or a Google Maps link" style="min-width:280px"><button class="btn pri" id="pls">Set pin</button><button class="btn" id="plc">Cancel</button></div></div>
   <div id="um" hidden></div>
   <div class="mg"><div id="map"></div><div id="lst"></div></div>
-  <p class="sub" style="margin:0">Use the tabs to switch between delinquent, partially paid, fully paid and unbilled accounts. Accounts appear on the map once they have a pin. To add a pin: click <b>Place pin</b> on an account, then click the map (or paste coordinates / a Google Maps link). Many at once: <b>Import pins</b> from a KML / KMZ exported from Google Earth or My Maps (each placemark needs the Contract No. or the exact Customer Name), or from a CSV / Excel file with Contract No. or Customer Name plus latitude and longitude.</p>
+  <p class="sub" style="margin:0">Click a pin, or a place in the list, for its details and a <b>Directions</b> link. Use the layer button on the map for Satellite view. Places come from the KML file uploaded by the administrator; <b>Export KML</b> downloads what is shown for Google Earth or My Maps.</p>
 </main>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const php=n=>Number(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const LEAF='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',MC='https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js',ZIP='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 /* phones / tablets get lighter map settings (no fade or marker zoom animation, smaller tile buffer) */
 const MOB=matchMedia('(pointer:coarse)').matches||innerWidth<760,STACK=matchMedia('(max-width:980px)');
 /* Leaflet first, then the clustering plugin; if the plugin cannot load the map still works (just unclustered) */
 const libP=loadLib(LEAF).then(()=>loadLib(MC).catch(()=>null));
-let recs=[],view=[],tab=0,CAN=false,map,layer,popup,cur=null,PinIcon,placing=null,lim=100,sk='m',sd=-1;
-const mk=new Map(),onMap=new Set(),ICONS=new Map(),SORTS={m:-1,name:1,b:-1,dn:1,jo:1};
-const PAID='#F97316',PART='#FACC15',UNB='#0EA5E9',pc=r=>r.s===3?UNB:r.s===2?PAID:r.s===1?PART:col(r.m);
-/* tabs: key = status s (0 delinquent, 1 partially paid, 2 fully paid, 3 unbilled) */
-const TABS=[[0,'Delinquent','#B91C1C'],[1,'Partially paid','#CA8A04'],[2,'Fully paid','#EA580C'],[3,'Unbilled','#0EA5E9']];
-const LG={0:'<span><i style="background:#F59E0B"></i>1 month unpaid</span><span><i style="background:#EA580C"></i>2 months</span><span><i style="background:#B91C1C"></i>3+ months</span><span><i style="background:#6B7280"></i>Not stated</span>',1:'<span><i style="background:#FACC15"></i>Checklist pin: partially paid (paid something, balance left)</span>',2:'<span><i style="background:#F97316"></i>Check mark pin: fully paid</span>',3:'<span><i style="background:#0EA5E9"></i>Unbilled: no balance and nothing paid</span>'};
-const col=m=>m>=3?'#B91C1C':m==2?'#EA580C':m==1?'#F59E0B':'#6B7280',mo=r=>r.s===3?'Unbilled':r.s===2?'✓ Paid':r.s===1?'✓ Partial':r.m>=1?r.m+' mo':'—',mcls=r=>r.s===1?' pt':'';
-function flash(t,bad){const m=$('#msg');m.textContent=t;m.style.color=bad?'var(--red-d)':'var(--ok)';clearTimeout(m._t);if(!bad)m._t=setTimeout(()=>m.textContent='',3000)}
+let recs=[],view=[],CAN=false,map,layer,popup,cur=null,PinIcon,placing=null,lim=100,pending=null;
+const mk=new Map(),onMap=new Set(),ICONS=new Map(),catCol=new Map(),UNC='Uncategorized';
+const PAL=['#E8171A','#2563EB','#16A34A','#9333EA','#EA580C','#0891B2','#CA8A04','#DB2777','#4D7C0F','#475569','#7C3AED','#0F766E'];
+const catOf=r=>r.c||UNC,pc=r=>catCol.get(catOf(r))||PAL[0];
+function flash(t,bad){const m=$('#msg');m.textContent=t;m.style.color=bad?'var(--red-d)':'var(--ok)';clearTimeout(m._t);if(!bad)m._t=setTimeout(()=>m.textContent='',4000)}
 /* "8.47, 124.64", a Google Maps link (@lat,lng or !3dlat!4dlng) -> [lat,lng] */
 function parseLL(s){s=String(s||'');const m=/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(s)||/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(s)||/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/.exec(s);if(!m)return null;const la=+m[1],ln=+m[2];return la>=-90&&la<=90&&ln>=-180&&ln<=180?[la,ln]:null}
-/* DN / JO status: "GEN 18" / "OK 18" / "TENDER 18" (same format as the DN / Job Order page; if several are typed the last one counts) */
-function pr(v){const m=[...String(v??'').matchAll(/(GEN|OK|TENDER)\s*(\d{1,2})/gi)].pop();return m?{k:m[1].toUpperCase(),d:+m[2]}:null}
-const RK={GEN:1,OK:2},RJ={GEN:1,TENDER:2,OK:3};
-const skey=(raw,T)=>{const p=pr(raw);return p?(T[p.k]||0)*100+p.d:String(raw||'').trim()?50:0};
-function tag(raw,l){const p=pr(raw);if(p)return`<span class="tg ${p.k==='GEN'?'g-gen':p.k==='OK'?'g-ok':'g-tn'}">${l} ${p.k} ${p.d}</span>`;raw=String(raw||'').trim();return`<span class="tg g-no">${l} ${raw?esc(raw):'—'}</span>`}
-/* everything the filter and the sort need is worked out once per account, not on every keystroke */
+/* everything the filter and the sort need is worked out once per place, not on every keystroke */
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-function prep(r){r._s=[r.name,r.cn,r.area,r.sub].join(' ').toLowerCase();r._n=norm(r.name);r.s=r.s||0;r._m=r.s>=2?0:+r.m||0;r._dk=skey(r.dn,RK);r._jk=skey(r.jo,RJ)}
-const cn=(x,y)=>x._n<y._n?-1:x._n>y._n?1:0,base=(x,y)=>y._m-x._m||y.b-x.b||cn(x,y);
-function cmp(){const d=sd;switch(sk){
- case'name':return(x,y)=>d*cn(x,y)||base(x,y);
- case'b':return(x,y)=>d*(x.b-y.b)||base(x,y);
- case'dn':return(x,y)=>d*(x._dk-y._dk)||base(x,y);
- case'jo':return(x,y)=>d*(x._jk-y._jk)||base(x,y);
- default:return(x,y)=>d*(x._m-y._m)||base(x,y)}}
-let pool=[];
-function refilter(){const q=$('#q').value.trim().toLowerCase(),a=$('#ar').value,t=$('#ty').value,m=$('#mm').value,p=$('#pn').value;
- /* pool = every filter except the tab, so each tab can show its own count; months unpaid only applies to Delinquent / Partially paid */
- pool=recs.filter(r=>(!a||String(r.area)===a)&&(!t||r.type===t)&&(!m||r.s>=2||(m==='3'?r.m>=3:String(r.m)===m))&&(!p||(p==='y')===(r.la!=null))&&(!q||r._s.includes(q)));
- view=pool.filter(r=>r.s===tab);view.sort(cmp())}
-function tabsUI(){const c=[0,0,0,0];for(const r of pool)c[r.s]++;$('#tabs').innerHTML=TABS.map(([k,n,col])=>`<button class="tb${k===tab?' on':''}" data-tab="${k}" style="--c:${col}">${n}<b>${c[k]}</b></button>`).join('');$('#lgd').innerHTML=LG[tab]+'<span>Bigger pin = bigger balance. Use the layer button on the map for Satellite view.</span>';const f=tab>=2,m=$('#mm');if(f)m.value='';m.disabled=f;m.title=f?'Not applicable to this tab':''}
-function pop(r){const g=r.la+','+r.ln;
- return`<div class="pp"><b>${esc(r.name)}</b><div class="sub">Contract ${esc(r.cn??'—')} · ${esc([r.area,r.sub].filter(Boolean).join(' / ')||'No area')}</div><div style="margin:6px 0"><span class="mb${mcls(r)}" style="background:${pc(r)}">${mo(r)}</span> ${r.s===3?'<b>No bill yet</b>':r.s===2?`<b>Fully paid</b>`:`<b>&#8369;${php(r.b)}</b>${r.s===1?' left to pay':''}`}</div>${(r.s===1||r.s===2)&&r.pd?`<div class="sub">Payment date ${esc(r.pd)}</div>`:''}${r.s<2&&r.d?`<div class="sub">Due ${esc(r.d)}</div>`:''}${r.dn||r.jo?`<div class="sub">DN: ${esc(r.dn||'—')} · JO: ${esc(r.jo||'—')}</div>`:''}${r.p?`<div class="sub">Phone ${esc(r.p)}</div>`:''}<div class="bar" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g}">Directions</a>${CAN?`<button class="btn" data-a="mv" data-id="${esc(r.id)}">Move pin</button><button class="btn" data-a="rm" data-id="${esc(r.id)}">Remove</button>`:''}</div></div>`}
-const item=r=>`<div class="it" data-a="go" data-id="${esc(r.id)}"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(r.name)}</b><span style="white-space:nowrap;font-weight:700">${r.s===3?'—':(r.s===2?'Paid':'&#8369;'+php(r.b))}</span></div><div class="sub"><span class="mb${mcls(r)}" style="background:${pc(r)}">${mo(r)}</span> ${esc(r.cn??'')} · ${esc(r.area)}${r.sub?' / '+esc(r.sub):''}</div><div class="sub" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${tag(r.dn,'DN')}${tag(r.jo,'JO')}</div><div class="sub">${r.la!=null?'&#128205; Pinned':'Not pinned'}${CAN&&r.la==null?` · <a href="#" data-a="pl" data-id="${esc(r.id)}">Place pin</a>`:''}</div></div>`;
+function prep(r){r.f=r.f||{};r._s=norm([r.n,r.c,r.d,...Object.values(r.f)].join(' '));r._n=norm(r.n)}
+const byName=(x,y)=>x._n<y._n?-1:x._n>y._n?1:0;
+function refilter(){const q=norm($('#q').value.trim()),c=$('#ct').value;view=recs.filter(r=>(!c||catOf(r)===c)&&(!q||r._s.includes(q)));view.sort(byName)}
+function catsUI(){const n=new Map();for(const r of recs)n.set(catOf(r),(n.get(catOf(r))||0)+1);
+ const c=$('#ct').value,l=[...n].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+ catCol.clear();l.forEach(([k],i)=>catCol.set(k,PAL[i%PAL.length]));
+ const names=[...n.keys()].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+ $('#ct').innerHTML='<option value="">All categories</option>'+names.map(x=>`<option value="${esc(x)}">${esc(x)} (${n.get(x)})</option>`).join('');$('#ct').value=n.has(c)?c:'';
+ $('#lgd').innerHTML=l.length>1||(l.length===1&&l[0][0]!==UNC)?l.slice(0,14).map(([k,v])=>`<button data-cat="${esc(k)}" class="${$('#ct').value===k?'on':''}"><i class="dot" style="background:${catCol.get(k)}"></i>${esc(k)} <span>${v}</span></button>`).join('')+(l.length>14?`<span>+${l.length-14} more (use the category list)</span>`:''):''}
+function pop(r){const g=r.la+','+r.ln,f=Object.entries(r.f||{}).filter(([k])=>!/^(name|description)$/i.test(k));
+ return`<div class="pp"><b>${esc(r.n)}</b><div class="sub"><i class="dot" style="background:${pc(r)}"></i>${esc(catOf(r))}</div>${r.d?`<div class="pd">${esc(r.d)}</div>`:''}${f.length?`<table class="pf">${f.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>`:''}<div class="sub">${r.la.toFixed(5)}, ${r.ln.toFixed(5)}</div><div class="bar" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g}">Directions</a><button class="btn" data-a="cp" data-id="${esc(r.id)}">Copy location</button>${CAN?`<button class="btn" data-a="mv" data-id="${esc(r.id)}">Move pin</button><button class="btn" data-a="rm" data-id="${esc(r.id)}">Remove</button>`:''}</div></div>`}
+const item=r=>`<div class="it" data-a="go" data-id="${esc(r.id)}"><b>${esc(r.n)}</b><div class="sub"><i class="dot" style="background:${pc(r)}"></i>${esc(catOf(r))}</div>${r.d?`<div class="sub">${esc(r.d.replace(/\s+/g,' ').slice(0,90))}${r.d.length>90?'…':''}</div>`:''}</div>`;
 const foot=()=>view.length>lim?`<div id="mr" style="padding:10px;text-align:center"><button class="btn" data-a="more">Show more (${view.length-lim} left)</button></div>`:'';
-function list(keep){const l=$('#lst'),st=l.scrollTop;l.innerHTML=view.length?view.slice(0,lim).map(item).join('')+foot():'<div class="empty">No accounts match.</div>';l.scrollTop=keep?st:0}
+function emptyMsg(){return recs.length?'No places match.':CAN?'No places on the map yet. Click <b>Upload KML</b> and choose your KML or KMZ file.':'The map has no places yet. Ask the administrator to upload the KML file.'}
+function list(keep){const l=$('#lst'),st=l.scrollTop;l.innerHTML=view.length?view.slice(0,lim).map(item).join('')+foot():`<div class="empty" style="padding:24px">${emptyMsg()}</div>`;l.scrollTop=keep?st:0}
 /* list rows are added in pieces as you scroll, so a long list never has to be built at once */
 function more(){if(lim>=view.length)return;const l=$('#lst'),o=lim;lim+=100;const f=$('#mr');if(f)f.remove();l.insertAdjacentHTML('beforeend',view.slice(o,lim).map(item).join('')+foot())}
 let _sc=0;$('#lst').addEventListener('scroll',()=>{if(_sc)return;_sc=requestAnimationFrame(()=>{_sc=0;const l=$('#lst');if(l.scrollTop+l.clientHeight>l.scrollHeight-400)more()})},{passive:true});
-function kpis(){let pin=0,tot=0;for(const r of view){if(r.la!=null)pin++;tot+=r.b}
- const K=[['Accounts',view.length]];if(tab<2)K.push(['Total unpaid','&#8369;'+php(tot)]);K.push(['Pinned on map',pin],['Not pinned yet',view.length-pin]);
- $('#kp').innerHTML=K.map(([t,n],i)=>`<div class="card kpi${i%2?' dark':''}"><small>${t}</small><b>${n}</b></div>`).join('')}
 /* ---- map ---- */
-/* one SVG template per colour + size step, cloned for each pin (cloning a node is far cheaper than parsing HTML for thousands of pins) */
-/* centre of the pin: plain dot = unpaid, small checklist = partially paid, check mark = fully paid */
-const GL=['<circle cx="17" cy="16.5" r="6" fill="#fff"/>',
- '<circle cx="17" cy="16.5" r="8.6" fill="#fff"/><g fill="none" stroke="#854D0E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 12.4l1.2 1.2 2.1-2.3M11.2 16.9l1.2 1.2 2.1-2.3M11.2 21.4l1.2 1.2 2.1-2.3"/><path d="M17 12.6h6M17 17.1h6M17 21.6h6"/></g>',
- '<circle cx="17" cy="16.5" r="8.6" fill="#fff"/><path d="M12.3 16.8l3.2 3.3 6.3-7" fill="none" stroke="#EA580C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
- '<circle cx="17" cy="16.5" r="8.6" fill="#fff"/><path d="M12.5 16.5h9" fill="none" stroke="#0369A1" stroke-width="3" stroke-linecap="round"/>'];
-function pinIcon(r){const st=Math.round(Math.min(.45,Math.sqrt(r.b)/900)*20),c=pc(r),k=c+st+'s'+(r.s||0);let i=ICONS.get(k);
- if(!i){const s=.95+st/20,w=Math.round(34*s),h=Math.round(46*s);
-  i=new PinIcon({iconSize:[w,h],iconAnchor:[w/2,h],popupAnchor:[0,-h+6],svg:`<svg viewBox="0 0 34 46" width="${w}" height="${h}"><ellipse cx="17" cy="44.2" rx="8" ry="2" fill="rgba(0,0,0,.32)"/><path d="M17 45C17 45 2.5 28 2.5 16.5 2.5 8 9 1.8 17 1.8S31.5 8 31.5 16.5C31.5 28 17 45 17 45Z" fill="${c}" stroke="#fff" stroke-width="3"/>${GL[r.s||0]}</svg>`});ICONS.set(k,i)}return i}
-function clusterIcon(c){const n=c.getChildCount();let mx=0,un=0,pt=0,ub=0;for(const m of c.getAllChildMarkers()){const q=m._r;if(!q.s){un=1;if(q._m>mx)mx=q._m}else if(q.s===1){pt=1;if(q._m>mx)mx=q._m}else if(q.s===3)ub=1}const cc=un?col(mx):pt?PART:ub?UNB:PAID;
- const s=n<10?34:n<100?40:n<1000?48:56;return L.divIcon({className:'cl',iconSize:[s,s],html:`<div class="mc" style="background:${cc};${!un&&pt?'color:#422006':''}"><span>${n>=1000?(n/1000).toFixed(1)+'k':n}</span></div>`})}
-function mkMarker(r,sg){const m=L.marker([r.la,r.ln],{icon:pinIcon(r),zIndexOffset:r.s>=2?0:(r._m+1)*1000+(r.s===1?-500:0),riseOnHover:!MOB,keyboard:false,title:MOB?'':r.name});m._r=r;m._sg=sg;return m}
+/* one SVG template per colour, cloned for each pin (cloning a node is far cheaper than parsing HTML for thousands of pins) */
+function pinIcon(r){const c=pc(r);let i=ICONS.get(c);
+ if(!i){const w=32,h=44;i=new PinIcon({iconSize:[w,h],iconAnchor:[w/2,h],popupAnchor:[0,-h+6],svg:`<svg viewBox="0 0 34 46" width="${w}" height="${h}"><ellipse cx="17" cy="44.2" rx="8" ry="2" fill="rgba(0,0,0,.32)"/><path d="M17 45C17 45 2.5 28 2.5 16.5 2.5 8 9 1.8 17 1.8S31.5 8 31.5 16.5C31.5 28 17 45 17 45Z" fill="${c}" stroke="#fff" stroke-width="3"/><circle cx="17" cy="16.5" r="6" fill="#fff"/></svg>`});ICONS.set(c,i)}return i}
+function clusterIcon(c){const n=c.getChildCount(),s=n<10?34:n<100?40:n<1000?48:56;return L.divIcon({className:'cl',iconSize:[s,s],html:`<div class="mc"><span>${n>=1000?(n/1000).toFixed(1)+'k':n}</span></div>`})}
+function mkMarker(r,sg){const m=L.marker([r.la,r.ln],{icon:pinIcon(r),riseOnHover:!MOB,keyboard:false,title:MOB?'':r.n});m._r=r;m._sg=sg;return m}
 const gAdd=a=>layer.addLayers?layer.addLayers(a):a.forEach(m=>layer.addLayer(m)),gRem=a=>layer.removeLayers?layer.removeLayers(a):a.forEach(m=>layer.removeLayer(m));
 /* only the pins that changed are added or removed (markers are kept and reused), and the plugin adds big batches in small slices so the page never freezes */
-function syncMap(){if(!layer)return;const want=new Map();for(const r of view)if(r.la!=null)want.set(r.id,r);
+function syncMap(){if(!layer)return;const want=new Map();for(const r of view)want.set(r.id,r);
  let rem=[],add=[];
  for(const id of onMap)if(!want.has(id)){const m=mk.get(id);if(m)rem.push(m);onMap.delete(id)}
- for(const[id,r]of want){let m=mk.get(id);const sg=r.la+','+r.ln+','+r.m+','+r.b+','+r.s;
+ for(const[id,r]of want){let m=mk.get(id);const sg=r.la+','+r.ln+','+catOf(r)+','+pc(r);
   if(m&&m._sg!==sg){if(onMap.has(id)){rem.push(m);onMap.delete(id)}m=null}
   if(!m){m=mkMarker(r,sg);mk.set(id,m)}else m._r=r;
   if(!onMap.has(id)){add.push(m);onMap.add(id)}}
@@ -149,100 +124,92 @@ function syncMap(){if(!layer)return;const want=new Map();for(const r of view)if(
  if(rem.length)gRem(rem);if(add.length)gAdd(add);
  if(cur&&!want.has(cur.id))map.closePopup()}
 function openPop(r,ll){const m=mk.get(r.id),a=m?m.options.icon.options.popupAnchor:[0,-40];popup.options.offset=L.point(a[0],a[1]+2);popup.setLatLng(ll||[r.la,r.ln]).setContent(pop(r)).openOn(map);cur=r}
-function fit(){const p=[];for(const r of view)if(r.la!=null)p.push([r.la,r.ln]);if(p.length)map.fitBounds(L.latLngBounds(p),{padding:[30,30],maxZoom:16,animate:!MOB})}
+function fit(){const p=view.map(r=>[r.la,r.ln]);if(p.length)map.fitBounds(L.latLngBounds(p),{padding:[30,30],maxZoom:16,animate:!MOB})}
 function show(r){const ll=[r.la,r.ln],z=Math.max(map.getZoom(),16);
  /* zoomToShowLayer opens a cluster (or fans out pins on the same spot) so the pin is really visible before its popup opens */
  const fin=()=>{const m=mk.get(r.id);if(m&&layer.zoomToShowLayer&&layer.hasLayer(m))layer.zoomToShowLayer(m,()=>openPop(r,m.getLatLng()));else openPop(r,ll)};
  if(map.getZoom()!==z||!map.getBounds().contains(ll)){map.once('moveend',fin);map.setView(ll,z,{animate:!MOB})}else fin();
  if(STACK.matches)$('#map').scrollIntoView({block:'center',behavior:'smooth'})}
-const st=()=>{$('#st').textContent=recs.length+' accounts'+(CAN?'':' (view only)')};
-function apply(keep){refilter();tabsUI();kpis();list(keep);syncMap();st()}
-function sortOnly(){view.sort(cmp());list();$('#sd').textContent=sd>0?'↑ Asc':'↓ Desc'}
-/* placing a pin */
-function startPlace(id){const r=recs.find(x=>x.id===id);if(!r)return;placing=r;map.closePopup();$('#pl').hidden=false;$('#plt').textContent='Click the map to place the pin for '+r.name+', or paste coordinates / a Google Maps link:';$('#pli').value='';$('#pli').focus();map.getContainer().style.cursor='crosshair';$('#map').scrollIntoView({block:'nearest'})}
+const st=()=>{$('#st').textContent=recs.length+' places'+(CAN?'':' (view only)')};
+function apply(keep){refilter();catsUI();list(keep);syncMap();st()}
+/* moving a pin */
+function startPlace(id){const r=recs.find(x=>x.id===id);if(!r)return;placing=r;map.closePopup();$('#pl').hidden=false;$('#plt').textContent='Click the map to move the pin of '+r.n+', or paste coordinates / a Google Maps link:';$('#pli').value='';$('#pli').focus();map.getContainer().style.cursor='crosshair';$('#map').scrollIntoView({block:'nearest'})}
 function endPlace(){placing=null;$('#pl').hidden=true;map.getContainer().style.cursor=''}
 async function savePin(r,la,ln){if(!(la>=4&&la<=22&&ln>=116&&ln<=128)&&!confirm('That location is outside the Philippines. Save it anyway?'))return;
- flash('Saving…');const j=await Auth.call('dmap_set',{id:r.id,la,ln});if(!j.ok)return flash(j.e||'Not saved',1);
- r.la=j.la;r.ln=j.ln;endPlace();apply(true);show(r);flash('Pin saved ✓')}
-async function rmPin(r){if(!confirm('Remove the pin of '+r.name+'?'))return;const j=await Auth.call('dmap_set',{id:r.id});if(!j.ok)return flash(j.e||'Not removed',1);delete r.la;delete r.ln;map.closePopup();apply(true);flash('Pin removed')}
+ flash('Saving…');const j=await Auth.call('map_move',{id:r.id,la,ln});if(!j.ok)return flash(j.e||'Not saved',1);
+ r.la=j.la;r.ln=j.ln;endPlace();apply(true);show(r);flash('Pin moved ✓')}
+async function rmPin(r){if(!confirm('Remove "'+r.n+'" from the map?'))return;const j=await Auth.call('map_del',{id:r.id});if(!j.ok)return flash(j.e||'Not removed',1);recs=recs.filter(x=>x!==r);map.closePopup();apply(true);flash('Place removed')}
+function copyLoc(r){const t=r.la+', '+r.ln;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>flash('Location copied'),()=>prompt('Copy this location:',t))}
 const act=e=>{const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,r=recs.find(x=>x.id===b.dataset.id);
  if(b.tagName==='A')e.preventDefault();
- if(a==='more')more()
- else if(a==='go'&&r){if(r.la!=null)show(r);else if(CAN)startPlace(r.id);else flash('This account has no pin yet',1)}
- else if(a==='pl'&&r)startPlace(r.id);else if(a==='mv'&&r)startPlace(r.id);else if(a==='rm'&&r)rmPin(r)};
+ if(a==='more')more();else if(a==='go'&&r)show(r);else if(a==='mv'&&r&&CAN)startPlace(r.id);else if(a==='rm'&&r&&CAN)rmPin(r);else if(a==='cp'&&r)copyLoc(r)};
 document.addEventListener('click',act);
 /* Leaflet stops clicks inside a popup from reaching the page, so the popup buttons are wired when the popup opens */
 function wirePop(e){const el=e.popup.getElement();if(el&&!el._w){el._w=1;el.addEventListener('click',act)}}
 $('#pls').onclick=()=>{const p=parseLL($('#pli').value);if(!p)return flash('Type coordinates like 8.4772, 124.6460',1);savePin(placing,p[0],p[1])};
 $('#pli').onkeydown=e=>{if(e.key==='Enter')$('#pls').click()};$('#plc').onclick=endPlace;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&placing)endPlace()});
-/* import pins: KML / KMZ (Google Earth, My Maps) or CSV / Excel */
-/* KML reader: handles Google Earth + Google My Maps exports. Contract no. is looked for in ExtendedData / SimpleData fields, then in the
-   name and description; the customer name is the placemark name (or a name field). Every placemark with a point is kept, also inside folders / MultiGeometry. */
-const CNK=/contract|account|acct|cln|^cn$/i,NMK=/customer|^name$|account name/i;
-function kml(t){t=String(t||'').replace(/^\uFEFF/,'').trim();const d=new DOMParser().parseFromString(t,'text/xml');if(d.querySelector('parsererror'))throw new Error('That KML file could not be read (it may be damaged)');
- const tx=(p,n)=>{const e=[...p.children].find(c=>c.localName===n);return e?(e.textContent||'').trim():''};
- const out=[];
+/* ---- KML / KMZ upload: everything (name, category, description, fields, location) comes from the file ---- */
+const clipT=(v,n)=>String(v??'').trim().slice(0,n);
+function plain(h){h=String(h||'');if(!/[<&]/.test(h))return h.trim();const t=new DOMParser().parseFromString(h.replace(/<\s*(br|\/p|\/div|\/tr|\/li)\b[^>]*>/gi,'\n').replace(/<\/t[dh]>/gi,' '),'text/html').body.textContent||'';return t.replace(/[ \t\u00a0]+/g,' ').replace(/\n\s*\n+/g,'\n').trim()}
+function kml(t){t=String(t||'').replace(/^\uFEFF/,'').trim();const d=new DOMParser().parseFromString(t,'text/xml');if(d.querySelector('parsererror'))throw new Error('That file could not be read as KML (it may be damaged)');
+ const kid=(p,n)=>[...p.children].find(c=>c.localName===n),tx=(p,n)=>{const e=kid(p,n);return e?(e.textContent||'').trim():''};
+ const doc=d.getElementsByTagName('Document')[0],docName=doc?tx(doc,'name'):'',out=[];let skipped=0;
  for(const p of d.getElementsByTagName('Placemark')){
-  const pt=p.getElementsByTagName('Point')[0],c=pt&&pt.getElementsByTagName('coordinates')[0];if(!c)continue;
-  const[ln,la]=c.textContent.trim().split(/\s+/)[0].split(',').map(Number);if(!(Number.isFinite(la)&&Number.isFinite(ln)))continue;
-  const nm=tx(p,'name'),ds=tx(p,'description').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ');
-  const f={};for(const e of p.getElementsByTagName('*')){if(e.localName==='Data'){const k=e.getAttribute('name'),v=[...e.children].find(x=>x.localName==='value');if(k&&v)f[k]=(v.textContent||'').trim()}else if(e.localName==='SimpleData'){const k=e.getAttribute('name');if(k)f[k]=(e.textContent||'').trim()}}
-  let cn='',name=nm;
-  for(const k in f){if(!cn&&CNK.test(k)&&/\d/.test(f[k]))cn=(f[k].match(/\d{3,}/)||[''])[0];if(NMK.test(k)&&f[k])name=f[k]}
-  const all=[nm,ds,...Object.values(f)].join(' | '),alt=[];
-  const m=/(?:contract|account|acct|cln)\s*(?:no\.?|number|#)?\s*[:#\-]?\s*(\d{3,})/i.exec(all);if(!cn&&m)cn=m[1];
-  for(const x of all.match(/\d{4,}/g)||[])if(x!==cn&&!alt.includes(x)&&alt.length<6)alt.push(x);
-  const nmClean=name.replace(/^\s*\d{4,}\s*[-–:]\s*/,'').replace(/\s*[-–:]\s*\d{4,}\s*$/,'').trim();
-  out.push({name:nmClean||name,cn,alt,la,ln})}
- return out}
-function sheetRow(r){const g=(...ks)=>{for(const k of Object.keys(r))if(ks.includes(k.toLowerCase().trim()))return r[k];return''};
- let la=Number(g('lat','latitude','y')),ln=Number(g('lng','lon','long','longitude','x'));
- if(!(la&&ln)){const p=parseLL(g('coordinates','location','coords','latlng'));if(p){la=p[0];ln=p[1]}}
- const name=String(g('customer name','name','customer','account name')).trim(),cn=String(g('contract no.','contract no','contract','contract number','cn')).trim();
- return la&&ln&&(name||cn)?{name,cn,la,ln}:null}
-async function readPins(f){const n=f.name.toLowerCase();
- if(n.endsWith('.kmz')){await loadLib(ZIP);const z=await JSZip.loadAsync(await f.arrayBuffer()),k=Object.keys(z.files).find(x=>/\.kml$/i.test(x));if(!k)throw new Error('There is no KML inside that KMZ');return kml(await z.files[k].async('string'))}
- if(n.endsWith('.kml')||n.endsWith('.xml'))return kml(await f.text());
- if(!/\.(csv|xlsx|xls|xlsm)$/.test(n)){const h=await f.slice(0,512).text();if(/<kml|<\?xml|<Placemark/i.test(h))return kml(await f.text());throw new Error('Unsupported file type. Use .kml, .kmz, .csv or .xlsx')}
- await loadLib(LIB.xlsx);const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}).map(sheetRow).filter(Boolean)}
+  const pt=p.getElementsByTagName('Point')[0],c=pt&&pt.getElementsByTagName('coordinates')[0];
+  const[ln,la]=c?c.textContent.trim().split(/\s+/)[0].split(',').map(Number):[NaN,NaN];
+  if(!(Number.isFinite(la)&&Number.isFinite(ln)&&la>=-90&&la<=90&&ln>=-180&&ln<=180&&!(la===0&&ln===0))){skipped++;continue}
+  const path=[];for(let a=p.parentNode;a&&a.nodeType===1;a=a.parentNode)if(a.localName==='Folder'){const n=tx(a,'name');if(n)path.unshift(n)}
+  const f={};for(const e of p.getElementsByTagName('*')){let k=null,v=null;if(e.localName==='Data'){k=e.getAttribute('name');const x=kid(e,'value');v=x?x.textContent:''}else if(e.localName==='SimpleData'){k=e.getAttribute('name');v=e.textContent}
+   if(k&&v!=null){v=plain(v);if(v&&!/^gx_media_links$/i.test(k)&&Object.keys(f).length<15)f[clipT(k,40)]=clipT(v,200)}}
+  const cat=clipT(path.join(' / ')||docName,80);
+  out.push({n:clipT(tx(p,'name')||f.name||f.Name,200)||'Unnamed',c:cat,d:clipT(plain(tx(p,'description')),1500),f,la:Math.round(la*1e6)/1e6,ln:Math.round(ln*1e6)/1e6})}
+ return{items:out,skipped}}
+async function readKml(f){const n=f.name.toLowerCase(),head=n.endsWith('.kmz')?'':await f.slice(0,2048).text(),zipped=n.endsWith('.kmz')||(await f.slice(0,2).text())==='PK';
+ if(zipped){await loadLib(ZIP);const z=await JSZip.loadAsync(await f.arrayBuffer()),k=Object.keys(z.files).find(x=>/\.kml$/i.test(x));if(!k)throw new Error('There is no KML inside that KMZ file');return kml(await z.files[k].async('string'))}
+ if(n.endsWith('.kml')||n.endsWith('.xml')||/<kml|<Placemark|<\?xml/i.test(head))return kml(await f.text());
+ throw new Error('Please choose a .kml or .kmz file')}
 $('#imp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
- try{flash('Reading '+f.name+'… (large files can take a moment)');const it=await readPins(f);if(!it.length)return flash('No locations found in that file',1);
-  if(!confirm('Found '+it.length+' locations in '+f.name+'.\n\nThey will be matched to accounts by Contract No. (or exact Customer Name) and saved as pins. Continue?'))return flash('');
-  let saved=0,bad=0,miss=[];for(let i=0;i<it.length;i+=300){const j=await Auth.call('dmap_set',{items:it.slice(i,i+300).map(x=>({cn:x.cn,alt:x.alt,name:x.name,la:x.la,ln:x.ln}))});if(!j.ok)throw new Error(j.e||'Import failed');saved+=j.saved;bad+=j.invalid;miss.push(...j.missing)}
-  await load();const left=it.length-saved-bad;$('#um').hidden=!left;
-  if(left)$('#um').innerHTML='<b>'+left+' location(s) were not matched to an account</b> (they may be paid accounts or the name / contract number differs). First ones: '+esc(miss.slice(0,15).join('; '));
-  flash('Imported '+saved+' of '+it.length+' pins ✓',!saved);if(saved)fit()}
- catch(x){flash(x.message||'Import failed',1)}};
-/* export the pins shown as KML (opens in Google Earth, can be imported into My Maps) */
-function exportKml(){const l=view.filter(r=>r.la!=null);if(!l.length)return flash('Nothing pinned to export',1);
- const X=s=>String(s??'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c])),B=r=>r.s===3?6:r.s===2?4:r.s===1?5:r.m>=3?3:r.m==2?2:r.m==1?1:0,C=['ff80726b','ff0b9ef5','ff0c58ea','ff1c1cb9','ff1673f9','ff15ccfa','ffe9a50e'];
- const st=C.map((c,i)=>`<Style id="s${i}"><IconStyle><color>${c}</color><scale>0.9</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>`).join('');
- const pm=l.map(r=>`<Placemark><name>${X(r.name)}</name><description>${X('Contract: '+(r.cn??'')+' | Area: '+[r.area,r.sub].filter(Boolean).join(' / ')+' | Status: '+(r.s===3?'Unbilled':r.s===2?'Fully paid':r.s===1?'Partially paid':'Delinquent')+' | Months unpaid: '+(r.m??'')+' | Remaining balance: PHP '+php(r.b)+(r.pd?' | Payment date: '+r.pd:''))}</description><styleUrl>#s${B(r)}</styleUrl><Point><coordinates>${r.ln},${r.la},0</coordinates></Point></Placemark>`).join('');
- const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Accounts</name>'+st+pm+'</Document></kml>'],{type:'application/vnd.google-earth.kml+xml'}));
- a.download='Accounts_'+TABS[tab][1].replace(/ /g,'_')+'_'+new Date().toISOString().slice(0,10)+'.kml';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+ try{flash('Reading '+f.name+'… (large files can take a moment)');const r=await readKml(f);
+  if(!r.items.length)return flash('No places (points) found in that file'+(r.skipped?' - it only has lines or areas':''),1);
+  if(r.items.length>30000)return flash('That file has '+r.items.length+' places; the limit is 30000',1);
+  pending={items:r.items,name:f.name};const k=new Set(r.items.map(x=>x.c||UNC)).size;
+  $('#msg').textContent='';$('#up').hidden=false;$('#upt').textContent=f.name+': '+r.items.length+' places in '+k+' categor'+(k===1?'y':'ies');
+  $('#upn').textContent=(recs.length?'The map has '+recs.length+' places now. Replace removes them first (a backup is kept); Add keeps them and skips duplicates.':'Ready to put these places on the map.')+(r.skipped?' '+r.skipped+' line(s) / area(s) in the file are skipped (only points are shown).':'');
+  $('#upr').textContent=recs.length?'Replace the map':'Upload';$('#upa').hidden=!recs.length}
+ catch(x){flash(x.message||'Could not read the file',1)}};
+async function doUpload(mode){if(!pending)return;const p=pending,B=[$('#upr'),$('#upa'),$('#upx')];B.forEach(b=>b.disabled=true);
+ try{let saved=0,dup=0,bad=0;const N=300;
+  for(let i=0;i<p.items.length;i+=N){$('#upn').textContent='Saving '+Math.min(i+N,p.items.length)+' of '+p.items.length+'…';
+   const j=await Auth.call('map_put',{mode,first:i===0,last:i+N>=p.items.length,total:p.items.length,n:p.name,items:p.items.slice(i,i+N)});if(!j.ok)throw new Error(j.e||'Upload failed');saved+=j.saved;dup+=j.dup;bad+=j.invalid}
+  pending=null;$('#up').hidden=true;await load();fit();flash('Uploaded '+saved+' places ✓'+(dup?' ('+dup+' duplicates skipped)':'')+(bad?' ('+bad+' invalid)':''))}
+ catch(x){$('#upn').textContent='';flash(x.message||'Upload failed',1);await load().catch(()=>0)}
+ B.forEach(b=>b.disabled=false)}
+$('#upr').onclick=()=>doUpload('replace');$('#upa').onclick=()=>doUpload('add');$('#upx').onclick=()=>{pending=null;$('#up').hidden=true};
+/* export the places shown as KML (opens in Google Earth, can be imported into My Maps); one folder per category */
+function exportKml(){if(!view.length)return flash('Nothing to export',1);
+ const X=s=>String(s??'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c])),g=new Map();for(const r of view){const k=catOf(r);(g.get(k)||g.set(k,[]).get(k)).push(r)}
+ const pm=r=>`<Placemark><name>${X(r.n)}</name>${r.d?`<description>${X(r.d)}</description>`:''}${Object.keys(r.f||{}).length?`<ExtendedData>${Object.entries(r.f).map(([k,v])=>`<Data name="${X(k)}"><value>${X(v)}</value></Data>`).join('')}</ExtendedData>`:''}<Point><coordinates>${r.ln},${r.la},0</coordinates></Point></Placemark>`;
+ const body=[...g].map(([k,l])=>`<Folder><name>${X(k)}</name>${l.map(pm).join('')}</Folder>`).join('');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>CEPALCO Map</name>'+body+'</Document></kml>'],{type:'application/vnd.google-earth.kml+xml'}));
+ a.download='CEPALCO_Map_'+new Date().toISOString().slice(0,10)+'.kml';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 $('#exp').onclick=exportKml;$('#fit').onclick=fit;
 const dq=debounce(()=>{lim=100;apply()},180);$('#q').addEventListener('input',dq);
-['#ar','#ty','#mm','#pn'].forEach(s=>$(s).addEventListener('change',()=>{lim=100;apply();fit()}));
-$('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;tab=+b.dataset.tab;lim=100;apply();fit();$('#lst').scrollTop=0});
-$('#clr').onclick=()=>{$('#q').value='';['#ar','#ty','#mm','#pn'].forEach(s=>$(s).value='');lim=100;apply();fit()};
-$('#so').onchange=()=>{sk=$('#so').value;sd=SORTS[sk];lim=100;sortOnly()};
-$('#sd').onclick=()=>{sd=-sd;lim=100;sortOnly()};
-async function load(p){const j=await(p||Auth.call('dmap_get'));if(j.e){$('#st').textContent=j.e;return false}
- recs=j.r;recs.forEach(prep);CAN=!!j.canEdit;$('#impl').hidden=!CAN;
- if(layer){map.closePopup();layer.clearLayers();mk.clear();onMap.clear()}
- const u=k=>[...new Set(recs.map(r=>String(r[k]??'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})),keep=(s,v,all)=>{const c=$(s).value;$(s).innerHTML=`<option value="">${all}</option>`+v.map(x=>`<option>${esc(x)}</option>`).join('');$(s).value=c};
- keep('#ar',u('area'),'All areas');keep('#ty',u('type'),'All customer types');apply();
- /* the server must be the new version, otherwise the other tabs would be empty */
- if(j.v!==2){$('#um').hidden=false;$('#um').innerHTML='<b>The server part is an old version.</b> Redeploy the site so <code>netlify/functions/api.js</code> is up to date, then refresh, so the Partially paid, Fully paid and Unbilled tabs are filled.'}
- else $('#um').hidden=true;
+$('#ct').addEventListener('change',()=>{lim=100;apply();fit()});
+$('#lgd').addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;$('#ct').value=$('#ct').value===b.dataset.cat?'':b.dataset.cat;lim=100;apply();fit()});
+$('#clr').onclick=()=>{$('#q').value='';$('#ct').value='';lim=100;apply();fit()};
+async function load(p){const j=await(p||Auth.call('map_get'));if(j.e){$('#st').textContent=j.e;return false}
+ recs=j.r||[];recs.forEach(prep);CAN=!!j.canEdit;$('#impl').hidden=!CAN;
+ if(layer){map.closePopup();layer.clearLayers();mk.clear();onMap.clear();ICONS.clear()}
+ apply();
+ if(j.v!==3){$('#um').hidden=false;$('#um').innerHTML='<b>The server part is an old version.</b> Redeploy the site so <code>netlify/functions/api.js</code> is up to date, then refresh.'}else $('#um').hidden=true;
  return true}
 function initMap(){
  /* a pin is a cloned SVG node; Leaflet's own Icon does the sizing and anchoring */
  PinIcon=L.Icon.extend({options:{className:'pin'},createIcon(){let t=this._t;if(!t){t=this._t=document.createElement('div');t.innerHTML=this.options.svg}const d=t.cloneNode(true);this._setIconStyles(d,'icon');return d},createShadow(){return null}});
- /* opens on the same area as the Google Earth map (Cagayan de Oro and the surrounding towns) until pins exist */
- map=L.map('map',{zoomSnap:1,wheelPxPerZoomLevel:100,wheelDebounceTime:30,bounceAtZoomLimits:false,markerZoomAnimation:!MOB,fadeAnimation:!MOB}).setView([8.5945,124.7555],10);
- const T={maxZoom:19,keepBuffer:MOB?2:4,updateWhenIdle:MOB,updateWhenZooming:false,updateInterval:120};
+ /* opens on Cagayan de Oro and the surrounding towns until pins exist */
+ map=L.map('map',{zoomSnap:1,wheelPxPerZoomLevel:100,wheelDebounceTime:30,bounceAtZoomLimits:false,markerZoomAnimation:!MOB,fadeAnimation:!MOB}).setView([8.4772,124.6460],11);
+ const T={referrerPolicy:'strict-origin-when-cross-origin',maxZoom:19,keepBuffer:MOB?2:4,updateWhenIdle:MOB,updateWhenZooming:false,updateInterval:120};
  const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{...T,attribution:'&copy; OpenStreetMap contributors'}),sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{...T,maxNativeZoom:18,attribution:'Tiles &copy; Esri'});
  osm.addTo(map);L.control.layers({Street:osm,Satellite:sat},null,{position:'topright'}).addTo(map);
  layer=L.markerClusterGroup?L.markerClusterGroup({chunkedLoading:true,chunkInterval:60,chunkDelay:10,showCoverageOnHover:false,removeOutsideVisibleBounds:true,animate:!MOB,animateAddingMarkers:false,spiderfyOnMaxZoom:true,maxClusterRadius:z=>z>=17?30:z>=15?45:60,iconCreateFunction:clusterIcon}):L.featureGroup();
@@ -252,26 +219,10 @@ function initMap(){
  layer.on('click',e=>{const m=e.layer;if(m&&m._r)openPop(m._r,m.getLatLng())});
  map.on('popupopen',wirePop);map.on('popupclose',()=>{cur=null});
  map.on('click',e=>{if(placing)savePin(placing,e.latlng.lat,e.latlng.lng)});
- if(window.ResizeObserver){let t;new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(()=>map.invalidateSize({animate:false,pan:false}),120)}).observe($('#map'))}
- dirInit()}
-function dirInit(){$('#sd').textContent=sd>0?'↑ Asc':'↓ Desc'}
-/* Load Excel (admin only): reads the MONITORING FOR CODE sheet in the browser and saves it on the server. Pins already placed are kept (matched by contract no. + name). */
-const DCOLS=['CUSTOMER TYPE','BILLING','DN/ODAA','JOB-ORDER','CLN','SUB-AREA','CUSTOMER NAME','AREA','RATE SCHED','CONTRACT NO.','MONTHS UNPAID','DUE DATE','PAYMENT DATE','REMAINING BALANCE','SMS','EMAIL','FIELD REMARKS','PHONE NO.','EMAIL ADDRESS','Contact Person'],DATEC=new Set(['DUE DATE','PAYMENT DATE']);
-const ymd=d=>d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
-function xcell(k,v){if(v===''||v==null)return null;if(typeof v==='string'&&/^#(REF|N\/A|VALUE|DIV|NAME|NUM|NULL)/.test(v))return null;
- if(DATEC.has(k)){if(v instanceof Date)return ymd(new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate())));if(typeof v==='number')return new Date(Math.round((Math.floor(v)-25569)*864e5)).toISOString().slice(0,10);const d=new Date(v);return isNaN(d)?null:ymd(new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())))}
- return v}
-$('#f').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
- if(recs.length&&!confirm('Replace all '+recs.length+' accounts with the contents of "'+f.name+'"?\n\nPins you already placed are kept.'))return;
- const fr=new FileReader();fr.onload=async()=>{try{await loadLib(LIB.xlsx);const wb=XLSX.read(fr.result,{type:'array'}),ws=wb.Sheets['MONITORING FOR CODE']||wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:null}),idx={};
-  DCOLS.forEach(k=>idx[k.toUpperCase()]=k);
-  const r=raw.map(x=>{const o={};for(const h in x){const k=idx[String(h).trim().toUpperCase()];if(k)o[k]=xcell(k,x[h])}return o}).filter(o=>o['CUSTOMER NAME']||o['CONTRACT NO.']);
-  if(!r.length)throw new Error('no accounts found (needs a CUSTOMER NAME column)');
-  $('#st').textContent='Saving '+r.length+' accounts…';const j=await Auth.call('putdata',{n:f.name,r});
-  if(!j.ok)throw new Error(j.e||'not saved');await load();fit();flash(r.length+' accounts loaded')}catch(x){$('#st').textContent='Not loaded: '+x.message}};fr.readAsArrayBuffer(f)};
+ if(window.ResizeObserver){let t;new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(()=>map.invalidateSize({animate:false,pan:false}),120)}).observe($('#map'))}}
 Auth.ready.then(async ok=>{if(!ok)return;
- /* the account data is requested at the same time as the map libraries load */
- const dp=Auth.call('dmap_get');
+ /* the place data is requested at the same time as the map libraries load */
+ const dp=Auth.call('map_get');
  try{await libP}catch(e){$('#st').textContent=e.message;return}
  initMap();if(await load(dp))fit()});
 </script>
