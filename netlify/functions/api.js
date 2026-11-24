@@ -69,6 +69,13 @@ const okLL = (la, ln) => Number.isFinite(la) && Number.isFinite(ln) && la >= -90
 // Overdue balances (from the collection reports): one snapshot, replaced by every upload. Stored as { at, by, asof, run, files, n, sum, m: { contractNo without leading zeros: [amount, bills, status, loc number, name] } }.
 // BAL_NEEDS_EDIT: true = only users with Edit (and admin) can see or upload balances; false = anyone with View can see them.
 const MAX_BAL = 100000, BAL_NEEDS_EDIT = true;
+// contract number of a place (without leading zeros): from its CONTRACTNO field or the "CONTRACTNO: ..." line of its description
+const pkey = p => { let v = ""; if (p.f) for (const k in p.f) if (/contract/i.test(k)) { v = p.f[k]; break; } if (!v && p.d) { const m = /contract\s*(?:no\.?|number|#)?\s*[:=]\s*(\d[\d-]*)/i.exec(p.d); if (m) v = m[1]; } return String(v).replace(/\D/g, "").replace(/^0+/, ""); };
+let _bk = null, _bkAt = 0;   // set of contract numbers that have a balance (kept a few seconds; bal_put / bal_del refresh it)
+async function balKeys(s) {
+  if (_bk && Date.now() - _bkAt < FRESH) return _bk;
+  const r = await s.get("bal", { type: "json", consistency: "strong" }); _bk = r && r.m ? new Set(Object.keys(r.m)) : null; _bkAt = Date.now(); return _bk;
+}
 const MAX_PLACES = 250000, SHARD_MAX = 1000, PAGE_BYTES = 3.2e6;
 function normPlace(it, sid) {
   const la = Number(it && it.la), ln = Number(it && it.ln); if (!okLL(la, ln)) return null;
@@ -159,14 +166,26 @@ export default async (req) => {
   // Map: the places, a page at a time ({from}: shard number to start at). Each reply holds as many whole shards as fit in about 3 MB and says where the next one starts.
   if (a === "map_get") {
     if (!can(me, db, "dmap")) return J({ e: "Not allowed" }, 403);
-    const x = await readIdx(s), out = []; let j = Math.max(0, Number(b.from) || 0), bytes = 0;
-    while (j < x.sh.length) {
-      const t = await s.get("ps-" + x.sh[j].k), sz = t ? t.length : 0;
-      if (out.length && bytes + sz > PAGE_BYTES) break;
-      try { if (t) out.push(...JSON.parse(t)); } catch { }
-      bytes += sz; j++;
+    const x = await readIdx(s), out = []; let j = Math.max(0, Number(b.from) || 0), bytes = 0, mode = "all";
+    // {bal: 1}: only the places that have an overdue balance. The server reads the shards (several at a time) and sends just those, so the browser gets a small fraction of the data.
+    const bk = b.bal && can(me, db, "dmap", BAL_NEEDS_EDIT ? "update" : "view") ? await balKeys(s) : null;
+    if (bk) {
+      mode = "bal"; const t0 = Date.now();
+      while (j < x.sh.length) {
+        const batch = x.sh.slice(j, j + 12), txt = await Promise.all(batch.map(e => s.get("ps-" + e.k).catch(() => null)));
+        for (const t of txt) { let arr = []; try { arr = t ? JSON.parse(t) : []; } catch { } for (const p of arr) if (bk.has(pkey(p))) { out.push(p); bytes += 120 + (p.n || "").length + (p.d || "").length; } }
+        j += batch.length;
+        if (bytes > PAGE_BYTES * 0.8 || Date.now() - t0 > 6000) break;
+      }
+    } else {
+      while (j < x.sh.length) {
+        const t = await s.get("ps-" + x.sh[j].k), sz = t ? t.length : 0;
+        if (out.length && bytes + sz > PAGE_BYTES) break;
+        try { if (t) out.push(...JSON.parse(t)); } catch { }
+        bytes += sz; j++;
+      }
     }
-    return J({ v: 4, r: out, next: j < x.sh.length ? j : null, total: total(x), at: x.at || 0, n: x.n || "", canEdit: can(me, db, "dmap", "update") });
+    return J({ v: 4, r: out, next: j < x.sh.length ? j : null, total: total(x), sh: x.sh.length, mode, at: x.at || 0, n: x.n || "", canEdit: can(me, db, "dmap", "update") });
   }
   // Upload from a KML, sent in chunks of up to 1000 places: {mode: "replace" | "add", first, last, total, n: file name, items: [{n, c, d, f, la, ln}]}. Every chunk becomes one shard.
   if (a === "map_put") {
@@ -207,13 +226,13 @@ export default async (req) => {
     for (const v of Object.values(m)) sum += v[0];
     const n = Object.keys(m).length; if (!n) return J({ e: "No valid balances found" }, 400);
     const rec = { at: Date.now(), by: me.u, asof: clip(b.asof, 40), run: clip(b.run, 20), files: (Array.isArray(b.files) ? b.files : []).slice(0, 10).map(x => clip(x, 80)), n, sum: Math.round(sum * 100) / 100, m };
-    await s.setJSON("bal", rec);
+    await s.setJSON("bal", rec); _bk = new Set(Object.keys(m)); _bkAt = Date.now();
     await audit(s, me, "upload balances", null, [["accounts", "", String(n)], ["as of", "", rec.asof], ["files", "", short(rec.files.join(", "))]]);
     return J({ ok: 1, n });
   }
   if (a === "bal_del") {
     if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to remove balances" }, 403);
-    await s.delete("bal"); await audit(s, me, "remove balances", null, null); return J({ ok: 1 });
+    await s.delete("bal"); _bk = null; _bkAt = Date.now(); await audit(s, me, "remove balances", null, null); return J({ ok: 1 });
   }
   // Move a pin ({id, la, ln}) or remove it (map_del {id}). Only the one shard that holds the place is rewritten.
   if (a === "map_move" || a === "map_del") {

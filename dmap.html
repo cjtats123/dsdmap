@@ -58,7 +58,7 @@
     <input id="q" placeholder="Search name, category or details" style="min-width:230px">
     <select id="ct"><option value="">All categories</option></select>
     <select id="bf" hidden><option value="">All balances</option><option value="any">With overdue balance</option><option value="10000">&#8369;10,000 and up</option><option value="50000">&#8369;50,000 and up</option><option value="100000">&#8369;100,000 and up</option><option value="none">No balance</option></select>
-    <button class="btn" id="clr">Clear</button><button class="btn" id="fit">Fit all pins</button>
+    <button class="btn" id="bmode" hidden></button><button class="btn" id="clr">Clear</button><button class="btn" id="fit">Fit all pins</button>
     <span class="grow" style="flex:1"></span>
     <label class="btn btn-load" id="impl" hidden>Upload KML<input type="file" id="imp" multiple accept=".kml,.kmz,.xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
     <label class="btn btn-load" id="bupl" hidden title="Upload the collection (overdue accounts) reports, one or several files">Upload balances<input type="file" id="bimp" multiple accept=".txt,.prn,.lst,.rpt,text/plain" hidden></label>
@@ -94,7 +94,8 @@ function parseLL(s){s=String(s||'');const m=/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const ck=v=>String(v||'').replace(/\D/g,'').replace(/^0+/,'');
 function ckey(r){for(const k in r.f)if(/contract/i.test(k)){const v=ck(r.f[k]);if(v)return v}const m=/contract\s*(?:no\.?|number|#)?\s*[:=]\s*(\d[\d-]*)/i.exec(r.d||'');return m?ck(m[1]):''}
-let BAL=null;const peso=n=>'\u20b1'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),bl=r=>BAL&&r._k?BAL.m[r._k]:null;
+let BAL=null,SHOWN='all',ALLP=false;try{ALLP=localStorage.getItem('dm_all')==='1'}catch{}
+const peso=n=>'\u20b1'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),bl=r=>BAL&&r._k?BAL.m[r._k]:null;
 const balHtml=r=>{const b=bl(r);return b?`<div class="bal"><b>Overdue ${peso(b[0])}</b><span>${b[1]} bill${b[1]===1?'':'s'}${b[2]?' \u00b7 '+esc(b[2]):''}${BAL.asof?' \u00b7 as of '+esc(BAL.asof):''}</span></div>`:''};
 function prep(r){r.f=r.f||{};r._k=ckey(r);r._c=canon(r.c);r._s=norm([r.n,r.c,r.d,...Object.values(r.f)].join(' '));r._n=norm(r.n)}
 const byName=(x,y)=>x._n<y._n?-1:x._n>y._n?1:0;
@@ -140,7 +141,7 @@ function show(r){const ll=[r.la,r.ln],z=Math.max(map.getZoom(),16);
  const fin=()=>{const m=mk.get(r.id);if(m&&layer.zoomToShowLayer&&layer.hasLayer(m))layer.zoomToShowLayer(m,()=>openPop(r,m.getLatLng()));else openPop(r,ll)};
  if(map.getZoom()!==z||!map.getBounds().contains(ll)){map.once('moveend',fin);map.setView(ll,z,{animate:!MOB})}else fin();
  if(STACK.matches)$('#map').scrollIntoView({block:'center',behavior:'smooth'})}
-const st=()=>{$('#st').textContent=recs.length.toLocaleString()+' places'+(CAN?'':' (view only)')};
+const st=()=>{$('#st').textContent=recs.length.toLocaleString()+(SHOWN==='bal'?' overdue accounts':' places')+(CAN?'':' (view only)')};
 function apply(keep){refilter();catsUI();list(keep);syncMap();st()}
 /* moving a pin */
 function startPlace(id){const r=recs.find(x=>x.id===id);if(!r)return;placing=r;map.closePopup();$('#pl').hidden=false;$('#plt').textContent='Click the map to move the pin of '+r.n+', or paste coordinates / a Google Maps link:';$('#pli').value='';$('#pli').focus();map.getContainer().style.cursor='crosshair';$('#map').scrollIntoView({block:'nearest'})}
@@ -212,7 +213,9 @@ function parseBal(t){const m=new Map();let asof='',run='',rows=0;
   if(!run){const y=/RUNDATE:\s*(\S+)/.exec(l);if(y)run=y[1]}}
  return{m,asof,run,rows}}
 async function loadBal(){BAL=null;try{const j=await Auth.call('bal_get');if(j&&j.ok&&j.n)BAL=j}catch{}
- $('#bf').hidden=!BAL;if(!BAL)$('#bf').value='';balPanel()}
+ $('#bf').hidden=!BAL;if(!BAL)$('#bf').value=''}
+function modeBtn(){const b=$('#bmode');b.hidden=!BAL;b.textContent=SHOWN==='bal'?'Show all pins':'Overdue accounts only';b.title=SHOWN==='bal'?'Now showing only accounts with an overdue balance (fast). Click to load every pin.':'Show only the accounts with an overdue balance (much faster to open)';const o=$('#bf option[value=none]');if(o){o.hidden=SHOWN==='bal';if(SHOWN==='bal'&&$('#bf').value==='none')$('#bf').value=''}}
+$('#bmode').onclick=async()=>{ALLP=SHOWN==='bal';try{localStorage.setItem('dm_all',ALLP?'1':'0')}catch{}await load();fit()};
 function balPanel(){const p=$('#bs');if(!BAL){p.hidden=true;return}
  const have=new Set();for(const r of recs)if(r._k)have.add(r._k);let ma=0,ms=0,un=0,us=0;
  for(const k in BAL.m){const a=BAL.m[k][0];if(have.has(k)){ma++;ms+=a}else{un++;us+=a}}
@@ -235,15 +238,14 @@ $('#bimp').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(
   if(!confirm('Save '+m.size.toLocaleString()+' accounts with overdue balances ('+peso(sum)+(asof?', as of '+asof:'')+')?'+(BAL?'\n\nThis replaces the balances now on the map.':'')+(bad.length?'\n\nNot used: '+bad.join('; '):''))){$('#msg').textContent='';return}
   flash('Saving balances\u2026');const j=await Auth.call('bal_put',{items,asof,run,files:names});
   if(!j.ok)return flash(j.e==='Unknown action'?'The server part is an old version. Redeploy the site so netlify/functions/api.js is up to date.':(j.e||'Balances not saved'),1);
-  BAL={m:Object.fromEntries(m),n:m.size,sum:Math.round(sum*100)/100,asof,run,files:names,by:'you',at:Date.now()};
-  $('#bf').hidden=false;balPanel();apply(true);flash('Balances saved \u2713 ('+m.size.toLocaleString()+' accounts)'+(conf?' - '+conf+' account(s) had different amounts in different files; the larger one was kept':''))}
+  flash('Matching balances to pins\u2026');await load();fit();flash('Balances saved \u2713 ('+m.size.toLocaleString()+' accounts)'+(conf?' - '+conf+' account(s) had different amounts in different files; the larger one was kept':''))}
  catch(x){flash(x.message||'Could not read the files',1)}};
 $('#bdl').onclick=()=>{const have=new Set();for(const r of recs)if(r._k)have.add(r._k);const rows=[];
  for(const k in BAL.m)if(!have.has(k)){const b=BAL.m[k];rows.push([k.padStart(9,'0'),b[3],b[4],b[0].toFixed(2),b[1],b[2]])}
  rows.sort((x,y)=>y[3]-x[3]);const q=v=>'"'+String(v).replace(/"/g,'""')+'"',a=document.createElement('a');
  a.href=URL.createObjectURL(new Blob(['\uFEFFcontract_no,loc_number,customer_name,overdue_amount,bills,status\r\n'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv'}));
  a.download='balances_not_on_map_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)};
-$('#bcl').onclick=async()=>{if(!confirm('Remove all overdue balances from the map?'))return;const j=await Auth.call('bal_del');if(!j.ok)return flash(j.e||'Not removed',1);BAL=null;$('#bf').hidden=true;$('#bf').value='';balPanel();apply(true);flash('Balances removed')};
+$('#bcl').onclick=async()=>{if(!confirm('Remove all overdue balances from the map?'))return;const j=await Auth.call('bal_del');if(!j.ok)return flash(j.e||'Not removed',1);await load();fit();flash('Balances removed')};
 $('#bx').onclick=()=>{$('#bs').hidden=true};$('#bf').addEventListener('change',()=>{lim=100;apply();fit()});
 /* export the places shown as KML (opens in Google Earth, can be imported into My Maps); one folder per category */
 function exportKml(){if(!view.length)return flash('Nothing to export',1);
@@ -258,11 +260,13 @@ $('#ct').addEventListener('change',()=>{lim=100;apply();fit()});
 $('#lgd').addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;$('#ct').value=$('#ct').value===b.dataset.cat?'':b.dataset.cat;lim=100;apply();fit()});
 $('#clr').onclick=()=>{$('#q').value='';$('#ct').value='';lim=100;apply();fit()};
 /* the server sends the places a page (a few MB) at a time, so even a map with 70,000+ places loads */
-async function fetchAll(first){let j=await first;if(j.e)return j;const r=j.r||[];while(j.next!=null){$('#st').textContent='Loading '+r.length.toLocaleString()+' of '+(j.total||0).toLocaleString()+' places…';const k=await Auth.call('map_get',{from:j.next});if(k.e)return k;r.push(...(k.r||[]));j={...j,next:k.next,total:k.total}}return{...j,r}}
-async function load(p){const j=await fetchAll(p||Auth.call('map_get'));if(j.e){$('#st').textContent=j.e;return false}
+async function fetchAll(first,ex){let j=await first;if(j.e)return j;const r=j.r||[];while(j.next!=null){$('#st').textContent=j.mode==='bal'?'Loading overdue accounts… '+Math.round(j.next/Math.max(1,j.sh||1)*100)+'%':'Loading '+r.length.toLocaleString()+' of '+(j.total||0).toLocaleString()+' places…';const k=await Auth.call('map_get',{from:j.next,...ex});if(k.e)return k;r.push(...(k.r||[]));j={...j,next:k.next,total:k.total}}return{...j,r,mode:j.mode}}
+const MQ=()=>ALLP?{}:{bal:1};
+async function load(p){const q=MQ(),bp=loadBal(),j=await fetchAll(p||Auth.call('map_get',q),q);await bp;if(j.e){$('#st').textContent=j.e;return false}
+ SHOWN=j.mode==='bal'&&BAL?'bal':'all';modeBtn();
  recs=j.r||[];recs.forEach(prep);CAN=!!j.canEdit;$('#impl').hidden=!CAN;$('#bupl').hidden=!CAN;
  if(layer){map.closePopup();layer.clearLayers();mk.clear();onMap.clear();ICONS.clear()}
- apply();loadBal().then(()=>{if(BAL)apply(true)});
+ apply();balPanel();
  if(j.v!==4){$('#um').hidden=false;$('#um').innerHTML='<b>The server part is an old version.</b> Redeploy the site so <code>netlify/functions/api.js</code> is up to date, then refresh.'}else $('#um').hidden=true;
  return true}
 function initMap(){
@@ -283,7 +287,7 @@ function initMap(){
  if(window.ResizeObserver){let t;new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(()=>map.invalidateSize({animate:false,pan:false}),120)}).observe($('#map'))}}
 Auth.ready.then(async ok=>{if(!ok)return;
  /* the place data is requested at the same time as the map libraries load */
- const dp=Auth.call('map_get');
+ const dp=Auth.call('map_get',MQ());
  try{await libP}catch(e){$('#st').textContent=e.message;return}
  initMap();if(await load(dp))fit()});
 </script>
