@@ -81,9 +81,8 @@ const libP=loadLib(LEAF).then(()=>loadLib(MC).catch(()=>null));
 let recs=[],view=[],CAN=false,map,layer,popup,cur=null,PinIcon,placing=null,lim=100,pending=null;
 const mk=new Map(),onMap=new Set(),ICONS=new Map(),catCol=new Map(),UNC='Uncategorized';
 const PAL=['#E8171A','#2563EB','#16A34A','#9333EA','#EA580C','#0891B2','#CA8A04','#DB2777','#4D7C0F','#475569','#7C3AED','#0F766E'];
-/* the six CEPALCO areas are always in the list (in this order, each with its own colour), even before a KML for them is uploaded. A KML folder called "Area 1", "Area 1 (CDO1)" ... counts as that area. */
-const AREAS=['Area 1 (CDO 1)','Area 2 (CDO 2)','Area 3 (Tagoloan)','Area 4 (Phividec/PIEMO)','Area 5 (Villanueva)','Area 6 (Jasaan)'];
-const canon=c=>{c=String(c||'').trim();const m=/^area\s*0*([1-6])(?!\d)/i.exec(c);return m?AREAS[m[1]-1]:c};
+/* the category is the KML folder name (or the document name), shown exactly as written */
+const canon=c=>String(c||'').trim();
 const catOf=r=>r._c||UNC,pc=r=>catCol.get(catOf(r))||PAL[0];
 function flash(t,bad){const m=$('#msg');m.textContent=t;m.style.color=bad?'var(--red-d)':'var(--ok)';clearTimeout(m._t);if(!bad)m._t=setTimeout(()=>m.textContent='',4000)}
 /* "8.47, 124.64", a Google Maps link (@lat,lng or !3dlat!4dlng) -> [lat,lng] */
@@ -93,8 +92,8 @@ const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLo
 function prep(r){r.f=r.f||{};r._c=canon(r.c);r._s=norm([r.n,r.c,r.d,...Object.values(r.f)].join(' '));r._n=norm(r.n)}
 const byName=(x,y)=>x._n<y._n?-1:x._n>y._n?1:0;
 function refilter(){const q=norm($('#q').value.trim()),c=$('#ct').value;view=recs.filter(r=>(!c||catOf(r)===c)&&(!q||r._s.includes(q)));view.sort(byName)}
-function catsUI(){const n=new Map(AREAS.map(a=>[a,0]));for(const r of recs)n.set(catOf(r),(n.get(catOf(r))||0)+1);
- const l=[...AREAS.map(a=>[a,n.get(a)]),...[...n].filter(([k])=>!AREAS.includes(k)).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))],c=$('#ct').value;
+function catsUI(){const n=new Map();for(const r of recs)n.set(catOf(r),(n.get(catOf(r))||0)+1);
+ const l=[...n].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])),c=$('#ct').value;
  catCol.clear();l.forEach(([k],i)=>catCol.set(k,PAL[i%PAL.length]));
  $('#ct').innerHTML='<option value="">All categories</option>'+l.map(([k,v])=>`<option value="${esc(k)}">${esc(k)} (${v.toLocaleString()})</option>`).join('');$('#ct').value=n.has(c)?c:'';
  $('#lgd').innerHTML=l.slice(0,14).map(([k,v])=>`<button data-cat="${esc(k)}" class="${$('#ct').value===k?'on':''}"><i class="dot" style="background:${catCol.get(k)}"></i>${esc(k)} <span>${v.toLocaleString()}</span></button>`).join('')+(l.length>14?`<span>+${l.length-14} more (use the category list)</span>`:'')}
@@ -104,7 +103,7 @@ function pop(r){const g=r.la+','+r.ln,f=Object.entries(r.f||{}).filter(([k])=>!/
 function snip(r){if(!r.d)return'';const n=norm(r.n),c=norm(catOf(r)),l=r.d.split('\n').map(x=>x.trim()).filter(x=>{const v=norm(x.includes(':')?x.slice(x.indexOf(':')+1).trim():x);return v&&v!==n&&v!==c});const t=l.slice(0,3).join(' · ');return t.length>100?t.slice(0,100)+'…':t}
 const item=r=>{const t=snip(r);return`<div class="it" data-a="go" data-id="${esc(r.id)}"><b>${esc(r.n)}</b><div class="sub"><i class="dot" style="background:${pc(r)}"></i>${esc(catOf(r))}</div>${t?`<div class="sub">${esc(t)}</div>`:''}</div>`};
 const foot=()=>view.length>lim?`<div id="mr" style="padding:10px;text-align:center"><button class="btn" data-a="more">Show more (${view.length-lim} left)</button></div>`:'';
-function emptyMsg(){const c=$('#ct').value;if(c&&!$('#q').value.trim()&&!recs.some(r=>catOf(r)===c))return'No places in '+esc(c)+' yet.'+(CAN?' Upload a KML that has it as a folder.':'');return recs.length?'No places match.':CAN?'No places on the map yet. Click <b>Upload KML</b> and choose your KML or KMZ file.':'The map has no places yet. Ask the administrator to upload the KML file.'}
+function emptyMsg(){const c=$('#ct').value;if(c&&!$('#q').value.trim()&&!recs.some(r=>catOf(r)===c))return'No places in '+esc(c)+'.';return recs.length?'No places match.':CAN?'No places on the map yet. Click <b>Upload KML</b> and choose your KML or KMZ file.':'The map has no places yet. Ask the administrator to upload the KML file.'}
 function list(keep){const l=$('#lst'),st=l.scrollTop;l.innerHTML=view.length?view.slice(0,lim).map(item).join('')+foot():`<div class="empty" style="padding:24px">${emptyMsg()}</div>`;l.scrollTop=keep?st:0}
 /* list rows are added in pieces as you scroll, so a long list never has to be built at once */
 function more(){if(lim>=view.length)return;const l=$('#lst'),o=lim;lim+=100;const f=$('#mr');if(f)f.remove();l.insertAdjacentHTML('beforeend',view.slice(o,lim).map(item).join('')+foot())}
