@@ -38,7 +38,7 @@
 .cl{background:none;border:0}
 .mc{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3),0 2px 5px rgba(0,0,0,.35);background:#E8171A}
 .leaflet-container{-webkit-tap-highlight-color:transparent;font:inherit}
-.pp{min-width:210px;font-size:13px}.pp .sub{margin-top:2px}
+.bal{margin:6px 0;padding:5px 8px;border-left:3px solid #dc2626;background:rgba(220,38,38,.09);border-radius:4px}.bal span{display:block;font-size:12px;opacity:.8}.pp{min-width:210px;font-size:13px}.pp .sub{margin-top:2px}
 .pd{white-space:pre-line;max-height:150px;overflow:auto;margin:6px 0;font-size:12.5px;overflow-wrap:anywhere}
 .pf{border-collapse:collapse;margin:6px 0;font-size:12px;width:100%}.pf td{padding:2px 6px 2px 0;vertical-align:top;overflow-wrap:anywhere}.pf td:first-child{color:var(--mute);white-space:nowrap}
 </style>
@@ -57,15 +57,18 @@
   <div class="card" style="padding:14px 18px"><div class="bar">
     <input id="q" placeholder="Search name, category or details" style="min-width:230px">
     <select id="ct"><option value="">All categories</option></select>
+    <select id="bf" hidden><option value="">All balances</option><option value="any">With overdue balance</option><option value="10000">&#8369;10,000 and up</option><option value="50000">&#8369;50,000 and up</option><option value="100000">&#8369;100,000 and up</option><option value="none">No balance</option></select>
     <button class="btn" id="clr">Clear</button><button class="btn" id="fit">Fit all pins</button>
     <span class="grow" style="flex:1"></span>
     <label class="btn btn-load" id="impl" hidden>Upload KML<input type="file" id="imp" multiple accept=".kml,.kmz,.xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
+    <label class="btn btn-load" id="bupl" hidden title="Upload the collection (overdue accounts) reports, one or several files">Upload balances<input type="file" id="bimp" multiple accept=".txt,.prn,.lst,.rpt,text/plain" hidden></label>
     <button class="btn" id="exp" title="Download the places shown as a KML file for Google Earth / My Maps">Export KML</button>
     <span id="msg" class="font-semibold"></span>
   </div>
   <div class="lgd" id="lgd"></div>
   </div>
   <div id="up" hidden><div class="bar"><b id="upt"></b><span class="grow" style="flex:1"></span><button class="btn pri" id="upr">Replace the map</button><button class="btn" id="upa">Add to the map</button><button class="btn" id="upx">Cancel</button></div><div class="sub" id="upn" style="margin-top:6px"></div></div>
+  <div id="bs" hidden><div class="bar"><b id="bst"></b><span class="grow" style="flex:1"></span><button class="btn" id="bdl">Download accounts not on the map (CSV)</button><button class="btn" id="bcl">Remove balances</button><button class="btn" id="bx">Hide</button></div><div class="sub" id="bsn" style="margin-top:6px"></div></div>
   <div id="pl" hidden><div class="bar"><b id="plt"></b><input id="pli" placeholder="8.4772, 124.6460  or a Google Maps link" style="min-width:280px"><button class="btn pri" id="pls">Set pin</button><button class="btn" id="plc">Cancel</button></div></div>
   <div id="um" hidden></div>
   <div class="mg"><div id="map"></div><div id="lst"></div></div>
@@ -89,19 +92,23 @@ function flash(t,bad){const m=$('#msg');m.textContent=t;m.style.color=bad?'var(-
 function parseLL(s){s=String(s||'');const m=/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(s)||/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(s)||/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/.exec(s);if(!m)return null;const la=+m[1],ln=+m[2];return la>=-90&&la<=90&&ln>=-180&&ln<=180?[la,ln]:null}
 /* everything the filter and the sort need is worked out once per place, not on every keystroke */
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-function prep(r){r.f=r.f||{};r._c=canon(r.c);r._s=norm([r.n,r.c,r.d,...Object.values(r.f)].join(' '));r._n=norm(r.n)}
+const ck=v=>String(v||'').replace(/\D/g,'').replace(/^0+/,'');
+function ckey(r){for(const k in r.f)if(/contract/i.test(k)){const v=ck(r.f[k]);if(v)return v}const m=/contract\s*(?:no\.?|number|#)?\s*[:=]\s*(\d[\d-]*)/i.exec(r.d||'');return m?ck(m[1]):''}
+let BAL=null;const peso=n=>'\u20b1'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),bl=r=>BAL&&r._k?BAL.m[r._k]:null;
+const balHtml=r=>{const b=bl(r);return b?`<div class="bal"><b>Overdue ${peso(b[0])}</b><span>${b[1]} bill${b[1]===1?'':'s'}${b[2]?' \u00b7 '+esc(b[2]):''}${BAL.asof?' \u00b7 as of '+esc(BAL.asof):''}</span></div>`:''};
+function prep(r){r.f=r.f||{};r._k=ckey(r);r._c=canon(r.c);r._s=norm([r.n,r.c,r.d,...Object.values(r.f)].join(' '));r._n=norm(r.n)}
 const byName=(x,y)=>x._n<y._n?-1:x._n>y._n?1:0;
-function refilter(){const q=norm($('#q').value.trim()),c=$('#ct').value;view=recs.filter(r=>(!c||catOf(r)===c)&&(!q||r._s.includes(q)));view.sort(byName)}
+function refilter(){const q=norm($('#q').value.trim()),c=$('#ct').value,f=BAL?$('#bf').value:'',fl=f?(r=>{const b=bl(r);return f==='none'?!b:f==='any'?!!b:!!b&&b[0]>=+f}):null;view=recs.filter(r=>(!c||catOf(r)===c)&&(!q||r._s.includes(q))&&(!fl||fl(r)));if(fl&&f!=='none')view.sort((x,y)=>bl(y)[0]-bl(x)[0]);else view.sort(byName)}
 function catsUI(){const n=new Map();for(const r of recs)n.set(catOf(r),(n.get(catOf(r))||0)+1);
  const l=[...n].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])),c=$('#ct').value;
  catCol.clear();l.forEach(([k],i)=>catCol.set(k,PAL[i%PAL.length]));
  $('#ct').innerHTML='<option value="">All categories</option>'+l.map(([k,v])=>`<option value="${esc(k)}">${esc(k)} (${v.toLocaleString()})</option>`).join('');$('#ct').value=n.has(c)?c:'';
  $('#lgd').innerHTML=l.slice(0,14).map(([k,v])=>`<button data-cat="${esc(k)}" class="${$('#ct').value===k?'on':''}"><i class="dot" style="background:${catCol.get(k)}"></i>${esc(k)} <span>${v.toLocaleString()}</span></button>`).join('')+(l.length>14?`<span>+${l.length-14} more (use the category list)</span>`:'')}
 function pop(r){const g=r.la+','+r.ln,f=Object.entries(r.f||{}).filter(([k])=>!/^(name|description)$/i.test(k));
- return`<div class="pp"><b>${esc(r.n)}</b><div class="sub"><i class="dot" style="background:${pc(r)}"></i>${esc(catOf(r))}</div>${r.d?`<div class="pd">${esc(r.d)}</div>`:''}${f.length?`<table class="pf">${f.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>`:''}<div class="sub">${r.la.toFixed(5)}, ${r.ln.toFixed(5)}</div><div class="bar" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g}">Directions</a><button class="btn" data-a="cp" data-id="${esc(r.id)}">Copy location</button>${CAN?`<button class="btn" data-a="mv" data-id="${esc(r.id)}">Move pin</button><button class="btn" data-a="rm" data-id="${esc(r.id)}">Remove</button>`:''}</div></div>`}
+ return`<div class="pp"><b>${esc(r.n)}</b><div class="sub"><i class="dot" style="background:${pc(r)}"></i>${esc(catOf(r))}</div>${balHtml(r)}${r.d?`<div class="pd">${esc(r.d)}</div>`:''}${f.length?`<table class="pf">${f.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>`:''}<div class="sub">${r.la.toFixed(5)}, ${r.ln.toFixed(5)}</div><div class="bar" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g}">Directions</a><button class="btn" data-a="cp" data-id="${esc(r.id)}">Copy location</button>${CAN?`<button class="btn" data-a="mv" data-id="${esc(r.id)}">Move pin</button><button class="btn" data-a="rm" data-id="${esc(r.id)}">Remove</button>`:''}</div></div>`}
 /* list preview of the description: leave out lines that only repeat the place name or the category, and lines with no value */
 function snip(r){if(!r.d)return'';const n=norm(r.n),c=norm(catOf(r)),l=r.d.split('\n').map(x=>x.trim()).filter(x=>{const v=norm(x.includes(':')?x.slice(x.indexOf(':')+1).trim():x);return v&&v!==n&&v!==c});const t=l.slice(0,3).join(' · ');return t.length>100?t.slice(0,100)+'…':t}
-const item=r=>{const t=snip(r);return`<div class="it" data-a="go" data-id="${esc(r.id)}"><b>${esc(r.n)}</b><div class="sub"><i class="dot" style="background:${pc(r)}"></i>${esc(catOf(r))}</div>${t?`<div class="sub">${esc(t)}</div>`:''}</div>`};
+const item=r=>{const t=snip(r);return`<div class="it" data-a="go" data-id="${esc(r.id)}"><b>${esc(r.n)}</b><div class="sub"><i class="dot" style="background:${pc(r)}"></i>${esc(catOf(r))}</div>${bl(r)?`<div class="sub" style="color:#b91c1c;font-weight:600">Overdue ${peso(bl(r)[0])}</div>`:''}${t?`<div class="sub">${esc(t)}</div>`:''}</div>`};
 const foot=()=>view.length>lim?`<div id="mr" style="padding:10px;text-align:center"><button class="btn" data-a="more">Show more (${view.length-lim} left)</button></div>`:'';
 function emptyMsg(){const c=$('#ct').value;if(c&&!$('#q').value.trim()&&!recs.some(r=>catOf(r)===c))return'No places in '+esc(c)+'.';return recs.length?'No places match.':CAN?'No places on the map yet. Click <b>Upload KML</b> and choose your KML or KMZ file.':'The map has no places yet. Ask the administrator to upload the KML file.'}
 function list(keep){const l=$('#lst'),st=l.scrollTop;l.innerHTML=view.length?view.slice(0,lim).map(item).join('')+foot():`<div class="empty" style="padding:24px">${emptyMsg()}</div>`;l.scrollTop=keep?st:0}
@@ -196,6 +203,48 @@ async function doUpload(mode){if(!pending)return;const p=pending,B=[$('#upr'),$(
  catch(x){$('#upn').textContent='';flash(x.message||'Upload failed',1);await load().catch(()=>0)}
  B.forEach(b=>b.disabled=false)}
 $('#upr').onclick=()=>doUpload('replace');$('#upa').onclick=()=>doUpload('add');$('#upx').onclick=()=>{pending=null;$('#up').hidden=true};
+/* ---- overdue balances: collection reports (.txt), matched to the pins by contract number ---- */
+const BRX=/^\s*(?:[\d,]+|\*+)\.(\S+)\s+(\d{9})\s+(.{0,30}?)\s+([\d,]+\.\d\d)\s+(\d+)\s+([YN])\s+(.*?)\s*$/;
+function parseBal(t){const m=new Map();let asof='',run='',rows=0;
+ for(const l of t.split(/\r?\n/)){const x=BRX.exec(l);
+  if(x){rows++;const k=ck(x[2]),a=+x[4].replace(/,/g,''),o=m.get(k);if(!o||a>o[0])m.set(k,[a,+x[5],clipT(x[7],20),x[1],clipT(x[3],30)]);continue}
+  if(!asof){const y=/As of\s+([A-Za-z]+)\s+(?:\d{1,2},?\s+)?(\d{4})/i.exec(l);if(y)asof=y[1]+' '+y[2]}
+  if(!run){const y=/RUNDATE:\s*(\S+)/.exec(l);if(y)run=y[1]}}
+ return{m,asof,run,rows}}
+async function loadBal(){BAL=null;try{const j=await Auth.call('bal_get');if(j&&j.ok&&j.n)BAL=j}catch{}
+ $('#bf').hidden=!BAL;if(!BAL)$('#bf').value='';balPanel()}
+function balPanel(){const p=$('#bs');if(!BAL){p.hidden=true;return}
+ const have=new Set();for(const r of recs)if(r._k)have.add(r._k);let ma=0,ms=0,un=0,us=0;
+ for(const k in BAL.m){const a=BAL.m[k][0];if(have.has(k)){ma++;ms+=a}else{un++;us+=a}}
+ $('#bst').textContent='Overdue balances: '+BAL.n.toLocaleString()+' accounts, '+peso(BAL.sum)+(BAL.asof?' (as of '+BAL.asof+')':'');
+ $('#bsn').textContent='On the map: '+ma.toLocaleString()+' accounts ('+peso(ms)+'). Not on the map (no pin with that contract number): '+un.toLocaleString()+' accounts ('+peso(us)+').'+(BAL.files&&BAL.files.length?' Files: '+BAL.files.join(', ')+'.':'')+(BAL.by?' Uploaded by '+BAL.by+(BAL.at?' on '+new Date(BAL.at).toLocaleDateString():'')+'.':'');
+ $('#bdl').hidden=!un;$('#bcl').hidden=!CAN;p.hidden=false}
+$('#bimp').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
+ try{const m=new Map(),names=[],bad=[],asofs=new Set();let conf=0,run='';
+  for(let i=0;i<fs.length;i++){const f=fs[i];flash('Reading '+f.name+(fs.length>1?' ('+(i+1)+' of '+fs.length+')':'')+'\u2026');
+   try{const r=parseBal(new TextDecoder('windows-1252').decode(await f.arrayBuffer()));
+    if(!r.rows){bad.push(f.name+' (not a collection report)');continue}
+    /* the reports overlap (each area list includes the smaller ones), so one account is counted once */
+    for(const [k,v] of r.m){const o=m.get(k);if(o&&o[0]!==v[0])conf++;if(!o||v[0]>o[0])m.set(k,v)}
+    if(r.asof)asofs.add(r.asof);if(!run)run=r.run;names.push(f.name)}
+   catch(x){bad.push(f.name+' ('+(x.message||'could not be read')+')')}
+   await new Promise(r=>setTimeout(r,0))}
+  if(!m.size)return flash('No balances found'+(bad.length?': '+bad.join('; '):'')+'. Choose the collection report .txt files.',1);
+  if(m.size>100000)return flash('Those files have '+m.size.toLocaleString()+' accounts; the limit is 100,000',1);
+  const asof=[...asofs].join(' / '),items=[];let sum=0;for(const [k,v] of m){items.push([k,v[0],v[1],v[2],v[3],v[4]]);sum+=v[0]}
+  if(!confirm('Save '+m.size.toLocaleString()+' accounts with overdue balances ('+peso(sum)+(asof?', as of '+asof:'')+')?'+(BAL?'\n\nThis replaces the balances now on the map.':'')+(bad.length?'\n\nNot used: '+bad.join('; '):''))){$('#msg').textContent='';return}
+  flash('Saving balances\u2026');const j=await Auth.call('bal_put',{items,asof,run,files:names});
+  if(!j.ok)return flash(j.e==='Unknown action'?'The server part is an old version. Redeploy the site so netlify/functions/api.js is up to date.':(j.e||'Balances not saved'),1);
+  BAL={m:Object.fromEntries(m),n:m.size,sum:Math.round(sum*100)/100,asof,run,files:names,by:'you',at:Date.now()};
+  $('#bf').hidden=false;balPanel();apply(true);flash('Balances saved \u2713 ('+m.size.toLocaleString()+' accounts)'+(conf?' - '+conf+' account(s) had different amounts in different files; the larger one was kept':''))}
+ catch(x){flash(x.message||'Could not read the files',1)}};
+$('#bdl').onclick=()=>{const have=new Set();for(const r of recs)if(r._k)have.add(r._k);const rows=[];
+ for(const k in BAL.m)if(!have.has(k)){const b=BAL.m[k];rows.push([k.padStart(9,'0'),b[3],b[4],b[0].toFixed(2),b[1],b[2]])}
+ rows.sort((x,y)=>y[3]-x[3]);const q=v=>'"'+String(v).replace(/"/g,'""')+'"',a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob(['\uFEFFcontract_no,loc_number,customer_name,overdue_amount,bills,status\r\n'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv'}));
+ a.download='balances_not_on_map_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)};
+$('#bcl').onclick=async()=>{if(!confirm('Remove all overdue balances from the map?'))return;const j=await Auth.call('bal_del');if(!j.ok)return flash(j.e||'Not removed',1);BAL=null;$('#bf').hidden=true;$('#bf').value='';balPanel();apply(true);flash('Balances removed')};
+$('#bx').onclick=()=>{$('#bs').hidden=true};$('#bf').addEventListener('change',()=>{lim=100;apply();fit()});
 /* export the places shown as KML (opens in Google Earth, can be imported into My Maps); one folder per category */
 function exportKml(){if(!view.length)return flash('Nothing to export',1);
  const X=s=>String(s??'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c])),g=new Map();for(const r of view){const k=catOf(r);(g.get(k)||g.set(k,[]).get(k)).push(r)}
@@ -211,9 +260,9 @@ $('#clr').onclick=()=>{$('#q').value='';$('#ct').value='';lim=100;apply();fit()}
 /* the server sends the places a page (a few MB) at a time, so even a map with 70,000+ places loads */
 async function fetchAll(first){let j=await first;if(j.e)return j;const r=j.r||[];while(j.next!=null){$('#st').textContent='Loading '+r.length.toLocaleString()+' of '+(j.total||0).toLocaleString()+' places…';const k=await Auth.call('map_get',{from:j.next});if(k.e)return k;r.push(...(k.r||[]));j={...j,next:k.next,total:k.total}}return{...j,r}}
 async function load(p){const j=await fetchAll(p||Auth.call('map_get'));if(j.e){$('#st').textContent=j.e;return false}
- recs=j.r||[];recs.forEach(prep);CAN=!!j.canEdit;$('#impl').hidden=!CAN;
+ recs=j.r||[];recs.forEach(prep);CAN=!!j.canEdit;$('#impl').hidden=!CAN;$('#bupl').hidden=!CAN;
  if(layer){map.closePopup();layer.clearLayers();mk.clear();onMap.clear();ICONS.clear()}
- apply();
+ apply();loadBal().then(()=>{if(BAL)apply(true)});
  if(j.v!==4){$('#um').hidden=false;$('#um').innerHTML='<b>The server part is an old version.</b> Redeploy the site so <code>netlify/functions/api.js</code> is up to date, then refresh.'}else $('#um').hidden=true;
  return true}
 function initMap(){

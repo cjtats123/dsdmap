@@ -66,6 +66,9 @@ const clip = (v, n) => String(v ?? "").replace(/\u0000/g, "").trim().slice(0, n)
 const keyNm = v => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
 const rnd = v => Math.round(v * 1e6) / 1e6;
 const okLL = (la, ln) => Number.isFinite(la) && Number.isFinite(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180 && !(la === 0 && ln === 0);
+// Overdue balances (from the collection reports): one snapshot, replaced by every upload. Stored as { at, by, asof, run, files, n, sum, m: { contractNo without leading zeros: [amount, bills, status, loc number, name] } }.
+// BAL_NEEDS_EDIT: true = only users with Edit (and admin) can see or upload balances; false = anyone with View can see them.
+const MAX_BAL = 100000, BAL_NEEDS_EDIT = true;
 const MAX_PLACES = 250000, SHARD_MAX = 1000, PAGE_BYTES = 3.2e6;
 function normPlace(it, sid) {
   const la = Number(it && it.la), ln = Number(it && it.ln); if (!okLL(la, ln)) return null;
@@ -187,6 +190,30 @@ export default async (req) => {
     if (b.first && mode === "replace") await gc(s, x);
     if (b.last) await audit(s, me, mode === "replace" ? "upload kml (replace)" : "upload kml (add)", null, [["places", "", String(Number(b.total) || arr.length)], ["file", "", short(b.n)]]);
     return J({ ok: 1, saved: arr.length, dup, invalid, total: total(x), backedUp });
+  }
+  // Overdue balances: bal_get (the snapshot), bal_put ({items: [[contract, amount, bills, status, loc, name]], asof, run, files}), bal_del.
+  if (a === "bal_get") {
+    if (!can(me, db, "dmap", BAL_NEEDS_EDIT ? "update" : "view")) return J({ e: "Not allowed" }, 403);
+    const r = await s.get("bal", { type: "json" }); return J(r ? { ok: 1, ...r } : { ok: 1, n: 0 });
+  }
+  if (a === "bal_put") {
+    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to upload balances" }, 403);
+    const items = Array.isArray(b.items) ? b.items.slice(0, MAX_BAL) : [], m = {}; let sum = 0;
+    for (const it of items) {
+      if (!Array.isArray(it)) continue;
+      const k = String(it[0] ?? "").replace(/\D/g, "").replace(/^0+/, ""), amt = Math.round(Number(it[1]) * 100) / 100; if (!k || !Number.isFinite(amt)) continue;
+      m[k] = [amt, Math.max(0, Math.min(999, Number(it[2]) | 0)), clip(it[3], 20), clip(it[4], 12), clip(it[5], 30)];
+    }
+    for (const v of Object.values(m)) sum += v[0];
+    const n = Object.keys(m).length; if (!n) return J({ e: "No valid balances found" }, 400);
+    const rec = { at: Date.now(), by: me.u, asof: clip(b.asof, 40), run: clip(b.run, 20), files: (Array.isArray(b.files) ? b.files : []).slice(0, 10).map(x => clip(x, 80)), n, sum: Math.round(sum * 100) / 100, m };
+    await s.setJSON("bal", rec);
+    await audit(s, me, "upload balances", null, [["accounts", "", String(n)], ["as of", "", rec.asof], ["files", "", short(rec.files.join(", "))]]);
+    return J({ ok: 1, n });
+  }
+  if (a === "bal_del") {
+    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to remove balances" }, 403);
+    await s.delete("bal"); await audit(s, me, "remove balances", null, null); return J({ ok: 1 });
   }
   // Move a pin ({id, la, ln}) or remove it (map_del {id}). Only the one shard that holds the place is rewritten.
   if (a === "map_move" || a === "map_del") {

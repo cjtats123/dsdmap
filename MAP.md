@@ -7,3 +7,4 @@
 - Pin colour = category (12 colours, most used categories first). Clusters are red with the count.
 - Limits: 250,000 places, name 200, category 80, description 1500 characters.
 - Backups (4 kept) are made before every upload and restore; restore them on the Admin page. Every upload, move and removal is in the Admin change log.
+- Overdue balances: `bal_get`, `bal_put` (one snapshot, replaced each upload, stored in the `bal` blob keyed by contract number without leading zeros), `bal_del`. Edit permission needed (`BAL_NEEDS_EDIT`).

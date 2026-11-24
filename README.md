@@ -26,3 +26,6 @@ One row: **Map**. **View** opens the map. **Edit** uploads KML files and moves /
 4. Deploy, sign in as `admin`, click **Upload KML**, then add users on the Admin page (or switch on Guest view).
 
 Users, places, backups and logs live in the site's Netlify Blobs store, so a redeploy never erases them. A new site starts empty.
+
+## Overdue balances (collection reports)
+Sign in as admin (or a user with **Edit**), click **Upload balances**, and choose the collection report `.txt` files (one or several at once, e.g. AREA2 to AREA6). The reports overlap, so each account is counted once. Balances are matched to pins by **contract number** (leading zeros ignored; the pin's `CONTRACTNO` field or `CONTRACTNO:` line in its description). Pins then show the overdue amount, and the **balance filter** lists the biggest first. A summary shows how many accounts have no pin, with a CSV download. Each upload replaces the previous balances. Only admin and users with Edit can see or upload balances (`BAL_NEEDS_EDIT` in `api.js`).
