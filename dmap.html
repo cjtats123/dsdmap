@@ -130,7 +130,7 @@ function show(r){const ll=[r.la,r.ln],z=Math.max(map.getZoom(),16);
  const fin=()=>{const m=mk.get(r.id);if(m&&layer.zoomToShowLayer&&layer.hasLayer(m))layer.zoomToShowLayer(m,()=>openPop(r,m.getLatLng()));else openPop(r,ll)};
  if(map.getZoom()!==z||!map.getBounds().contains(ll)){map.once('moveend',fin);map.setView(ll,z,{animate:!MOB})}else fin();
  if(STACK.matches)$('#map').scrollIntoView({block:'center',behavior:'smooth'})}
-const st=()=>{$('#st').textContent=recs.length+' places'+(CAN?'':' (view only)')};
+const st=()=>{$('#st').textContent=recs.length.toLocaleString()+' places'+(CAN?'':' (view only)')};
 function apply(keep){refilter();catsUI();list(keep);syncMap();st()}
 /* moving a pin */
 function startPlace(id){const r=recs.find(x=>x.id===id);if(!r)return;placing=r;map.closePopup();$('#pl').hidden=false;$('#plt').textContent='Click the map to move the pin of '+r.n+', or paste coordinates / a Google Maps link:';$('#pli').value='';$('#pli').focus();map.getContainer().style.cursor='crosshair';$('#map').scrollIntoView({block:'nearest'})}
@@ -154,12 +154,14 @@ const clipT=(v,n)=>String(v??'').trim().slice(0,n);
 function plain(h){h=String(h||'');if(!/[<&]/.test(h))return h.trim();const t=new DOMParser().parseFromString(h.replace(/<\s*(br|\/p|\/div|\/tr|\/li)\b[^>]*>/gi,'\n').replace(/<\/t[dh]>/gi,' '),'text/html').body.textContent||'';return t.replace(/[ \t\u00a0]+/g,' ').replace(/\n\s*\n+/g,'\n').trim()}
 function kml(t){t=String(t||'').replace(/^\uFEFF/,'').trim();const d=new DOMParser().parseFromString(t,'text/xml');if(d.querySelector('parsererror'))throw new Error('That file could not be read as KML (it may be damaged)');
  const kid=(p,n)=>[...p.children].find(c=>c.localName===n),tx=(p,n)=>{const e=kid(p,n);return e?(e.textContent||'').trim():''};
- const doc=d.getElementsByTagName('Document')[0],docName=doc?tx(doc,'name'):'',out=[];let skipped=0;
+ const doc=d.getElementsByTagName('Document')[0],docName=doc?tx(doc,'name'):'',out=[],FN=new Map();let skipped=0;
+ /* folder names are looked up once per folder (a folder can hold tens of thousands of placemarks) */
+ const fname=a=>{let n=FN.get(a);if(n===undefined){n='';for(let c=a.firstElementChild;c;c=c.nextElementSibling)if(c.localName==='name'){n=(c.textContent||'').trim();break}FN.set(a,n)}return n};
  for(const p of d.getElementsByTagName('Placemark')){
   const pt=p.getElementsByTagName('Point')[0],c=pt&&pt.getElementsByTagName('coordinates')[0];
   const[ln,la]=c?c.textContent.trim().split(/\s+/)[0].split(',').map(Number):[NaN,NaN];
   if(!(Number.isFinite(la)&&Number.isFinite(ln)&&la>=-90&&la<=90&&ln>=-180&&ln<=180&&!(la===0&&ln===0))){skipped++;continue}
-  const path=[];for(let a=p.parentNode;a&&a.nodeType===1;a=a.parentNode)if(a.localName==='Folder'){const n=tx(a,'name');if(n)path.unshift(n)}
+  const path=[];for(let a=p.parentNode;a&&a.nodeType===1;a=a.parentNode)if(a.localName==='Folder'){const n=fname(a);if(n)path.unshift(n)}
   const f={};for(const e of p.getElementsByTagName('*')){let k=null,v=null;if(e.localName==='Data'){k=e.getAttribute('name');const x=kid(e,'value');v=x?x.textContent:''}else if(e.localName==='SimpleData'){k=e.getAttribute('name');v=e.textContent}
    if(k&&v!=null){v=plain(v);if(v&&!/^gx_media_links$/i.test(k)&&Object.keys(f).length<15)f[clipT(k,40)]=clipT(v,200)}}
   const cat=clipT(path.join(' / ')||docName,80);
@@ -172,15 +174,15 @@ async function readKml(f){const n=f.name.toLowerCase(),head=n.endsWith('.kmz')?'
 $('#imp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
  try{flash('Reading '+f.name+'… (large files can take a moment)');const r=await readKml(f);
   if(!r.items.length)return flash('No places (points) found in that file'+(r.skipped?' - it only has lines or areas':''),1);
-  if(r.items.length>30000)return flash('That file has '+r.items.length+' places; the limit is 30000',1);
+  if(r.items.length>250000)return flash('That file has '+r.items.length+' places; the limit is 250,000',1);
   pending={items:r.items,name:f.name};const k=new Set(r.items.map(x=>x.c||UNC)).size;
-  $('#msg').textContent='';$('#up').hidden=false;$('#upt').textContent=f.name+': '+r.items.length+' places in '+k+' categor'+(k===1?'y':'ies');
-  $('#upn').textContent=(recs.length?'The map has '+recs.length+' places now. Replace removes them first (a backup is kept); Add keeps them and skips duplicates.':'Ready to put these places on the map.')+(r.skipped?' '+r.skipped+' line(s) / area(s) in the file are skipped (only points are shown).':'');
+  $('#msg').textContent='';$('#up').hidden=false;$('#upt').textContent=f.name+': '+r.items.length.toLocaleString()+' places in '+k+' categor'+(k===1?'y':'ies');
+  $('#upn').textContent=(recs.length?'The map has '+recs.length.toLocaleString()+' places now. Replace removes them first (a backup is kept); Add keeps them and skips duplicates.':'Ready to put these places on the map.')+(r.skipped?' '+r.skipped+' line(s) / area(s) in the file are skipped (only points are shown).':'');
   $('#upr').textContent=recs.length?'Replace the map':'Upload';$('#upa').hidden=!recs.length}
  catch(x){flash(x.message||'Could not read the file',1)}};
 async function doUpload(mode){if(!pending)return;const p=pending,B=[$('#upr'),$('#upa'),$('#upx')];B.forEach(b=>b.disabled=true);
- try{let saved=0,dup=0,bad=0;const N=300;
-  for(let i=0;i<p.items.length;i+=N){$('#upn').textContent='Saving '+Math.min(i+N,p.items.length)+' of '+p.items.length+'…';
+ try{let saved=0,dup=0,bad=0;const N=500;
+  for(let i=0;i<p.items.length;i+=N){$('#upn').textContent='Saving '+Math.min(i+N,p.items.length).toLocaleString()+' of '+p.items.length.toLocaleString()+'…';
    const j=await Auth.call('map_put',{mode,first:i===0,last:i+N>=p.items.length,total:p.items.length,n:p.name,items:p.items.slice(i,i+N)});if(!j.ok)throw new Error(j.e||'Upload failed');saved+=j.saved;dup+=j.dup;bad+=j.invalid}
   pending=null;$('#up').hidden=true;await load();fit();flash('Uploaded '+saved+' places ✓'+(dup?' ('+dup+' duplicates skipped)':'')+(bad?' ('+bad+' invalid)':''))}
  catch(x){$('#upn').textContent='';flash(x.message||'Upload failed',1);await load().catch(()=>0)}
@@ -198,11 +200,13 @@ const dq=debounce(()=>{lim=100;apply()},180);$('#q').addEventListener('input',dq
 $('#ct').addEventListener('change',()=>{lim=100;apply();fit()});
 $('#lgd').addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;$('#ct').value=$('#ct').value===b.dataset.cat?'':b.dataset.cat;lim=100;apply();fit()});
 $('#clr').onclick=()=>{$('#q').value='';$('#ct').value='';lim=100;apply();fit()};
-async function load(p){const j=await(p||Auth.call('map_get'));if(j.e){$('#st').textContent=j.e;return false}
+/* the server sends the places a page (a few MB) at a time, so even a map with 70,000+ places loads */
+async function fetchAll(first){let j=await first;if(j.e)return j;const r=j.r||[];while(j.next!=null){$('#st').textContent='Loading '+r.length.toLocaleString()+' of '+(j.total||0).toLocaleString()+' places…';const k=await Auth.call('map_get',{from:j.next});if(k.e)return k;r.push(...(k.r||[]));j={...j,next:k.next,total:k.total}}return{...j,r}}
+async function load(p){const j=await fetchAll(p||Auth.call('map_get'));if(j.e){$('#st').textContent=j.e;return false}
  recs=j.r||[];recs.forEach(prep);CAN=!!j.canEdit;$('#impl').hidden=!CAN;
  if(layer){map.closePopup();layer.clearLayers();mk.clear();onMap.clear();ICONS.clear()}
  apply();
- if(j.v!==3){$('#um').hidden=false;$('#um').innerHTML='<b>The server part is an old version.</b> Redeploy the site so <code>netlify/functions/api.js</code> is up to date, then refresh.'}else $('#um').hidden=true;
+ if(j.v!==4){$('#um').hidden=false;$('#um').innerHTML='<b>The server part is an old version.</b> Redeploy the site so <code>netlify/functions/api.js</code> is up to date, then refresh.'}else $('#um').hidden=true;
  return true}
 function initMap(){
  /* a pin is a cloned SVG node; Leaflet's own Icon does the sizing and anchoring */

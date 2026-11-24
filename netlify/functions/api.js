@@ -57,22 +57,38 @@ async function signlog(s, req, u, ev) {
 }
 
 // ---- map places (loaded from a KML file) ----
-// place = { id, n: name, c: category (KML folder), d: description, f: {extra fields}, la, ln }
+// place = { id, n: name, c: category (KML folder), d: description, f: {extra fields}, la, ln }   (empty c / d / f are left out)
+// Large maps (70,000+ places) are stored in shards of up to 1000 places each, so no single read, write or response gets too big:
+//   "pidx"  = { n: file name, at, sh: [{ i: shard id (first 6 characters of every place id in it), k: blob key, c: count }] }
+//   "ps-<k>" = the places of one shard      "pkeys" = short hashes of name + location (to skip duplicates when adding)
 const newId = () => crypto.randomBytes(6).toString("hex");
 const clip = (v, n) => String(v ?? "").replace(/\u0000/g, "").trim().slice(0, n);
 const keyNm = v => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
 const rnd = v => Math.round(v * 1e6) / 1e6;
 const okLL = (la, ln) => Number.isFinite(la) && Number.isFinite(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180 && !(la === 0 && ln === 0);
-const MAX_PLACES = 30000;
-function normPlace(it) {
+const MAX_PLACES = 250000, SHARD_MAX = 1000, PAGE_BYTES = 3.2e6;
+function normPlace(it, sid) {
   const la = Number(it && it.la), ln = Number(it && it.ln); if (!okLL(la, ln)) return null;
   const f = {}; if (it.f && typeof it.f === "object") for (const [k, v] of Object.entries(it.f).slice(0, 15)) { const kk = clip(k, 40), vv = clip(v, 200); if (kk && vv) f[kk] = vv; }
-  return { id: newId(), n: clip(it.n, 200) || "Unnamed", c: clip(it.c, 80), d: clip(it.d, 1500), f, la: rnd(la), ln: rnd(ln) };
+  const c = clip(it.c, 80), d = clip(it.d, 1500), p = { id: sid + crypto.randomBytes(4).toString("hex"), n: clip(it.n, 200) || "Unnamed", la: rnd(la), ln: rnd(ln) };
+  if (c) p.c = c; if (d) p.d = d; if (Object.keys(f).length) p.f = f; return p;
 }
-const pkey = p => keyNm(p.n) + "|" + p.la + "|" + p.ln;
-const loadPlaces = async s => { const a = (await s.get("places", { type: "json" })) || { n: "", r: [], at: 0 }; if (!Array.isArray(a.r)) a.r = []; _acc = a; _accAt = Date.now(); return a; };
-const readPlaces = async s => (_acc && Date.now() - _accAt < FRESH) ? _acc : loadPlaces(s);   // read-only views may use the short-lived copy
-const savePlaces = async (s, a) => { a.at = Date.now(); await s.setJSON("places", a); _acc = a; _accAt = Date.now(); };
+const hk = p => crypto.createHash("sha1").update(keyNm(p.n) + "|" + p.la + "|" + p.ln).digest("base64url").slice(0, 8);
+const emptyIdx = n => ({ n: n || "", at: 0, sh: [] });
+const total = x => x.sh.reduce((t, e) => t + e.c, 0);
+const loadIdx = async s => { const x = await s.get("pidx", { type: "json" }); _acc = x && Array.isArray(x.sh) ? x : emptyIdx(); _accAt = Date.now(); return _acc; };
+const readIdx = async s => (_acc && Date.now() - _accAt < FRESH) ? _acc : loadIdx(s);   // read-only views may use the short-lived copy
+const saveIdx = async (s, x) => { x.at = Date.now(); await s.setJSON("pidx", x); _acc = x; _accAt = Date.now(); };
+const loadShard = async (s, e) => { try { const t = await s.get("ps-" + e.k); return t ? JSON.parse(t) : []; } catch { return []; } };
+const loadPk = async s => (await s.get("pkeys", { type: "json" })) || [];
+// delete shard files that neither the live map nor any backup uses any more
+async function gc(s, x) {
+  try {
+    const keep = new Set(x.sh.map(e => "ps-" + e.k)); for (const b of ((await s.get("backups_idx", { type: "json" })) || [])) for (const k of b.sk || []) keep.add("ps-" + k);
+    const l = await s.list({ prefix: "ps-" });
+    for (const b of l.blobs || []) if (!keep.has(b.key)) { try { await s.delete(b.key); } catch { } }
+  } catch { /* cleaning up must never block an edit */ }
+}
 // ---- change log (who changed what) ----
 const AUDIT_MAX = 2000;
 const short = v => v === null || v === undefined ? "" : String(v).slice(0, 60);
@@ -83,12 +99,13 @@ async function audit(s, me, act, rec, d) {
     await s.setJSON("audit", l.slice(-AUDIT_MAX));
   } catch { /* the change log must never block an edit */ }
 }
-// ---- backups of the whole place list (kept before an upload and before a restore) ----
-const BK_KEEP = 8;
+// ---- backups of the whole place list (kept before an upload and before a restore). A backup only remembers which shard files made up the map, so it is quick even for 70,000+ places. ----
+const BK_KEEP = 4;
 async function backup(s, label) {
-  const cur = await s.get("places", { type: "json" }); if (!cur || !Array.isArray(cur.r) || !cur.r.length) return null;
+  const x = await loadIdx(s); if (!x.sh.length) return null;
   const idx = (await s.get("backups_idx", { type: "json" })) || [], key = "backup-" + Date.now() + "-" + newId();
-  await s.setJSON(key, cur); idx.push({ key, t: Date.now(), label, count: cur.r.length, n: cur.n || "" });
+  await s.setJSON(key, { n: x.n, sh: x.sh, pk: await loadPk(s) });
+  idx.push({ key, t: Date.now(), label, count: total(x), n: x.n || "", sk: x.sh.map(e => e.k) });
   while (idx.length > BK_KEEP) { const o = idx.shift(); try { await s.delete(o.key); } catch { } }
   await s.setJSON("backups_idx", idx); return key;
 }
@@ -135,43 +152,55 @@ export default async (req) => {
   }
   if (me.must) return J({ e: "Please choose a new password before continuing.", must: 1 }, 403);
 
-  // Map: every place with its category, description and extra fields. Everyone who may open the map receives it.
+  // Map: the places, a page at a time ({from}: shard number to start at). Each reply holds as many whole shards as fit in about 3 MB and says where the next one starts.
   if (a === "map_get") {
     if (!can(me, db, "dmap")) return J({ e: "Not allowed" }, 403);
-    const d = await readPlaces(s);
-    return J({ v: 3, r: d.r, at: d.at || 0, n: d.n || "", canEdit: can(me, db, "dmap", "update") });
+    const x = await readIdx(s), out = []; let j = Math.max(0, Number(b.from) || 0), bytes = 0;
+    while (j < x.sh.length) {
+      const t = await s.get("ps-" + x.sh[j].k), sz = t ? t.length : 0;
+      if (out.length && bytes + sz > PAGE_BYTES) break;
+      try { if (t) out.push(...JSON.parse(t)); } catch { }
+      bytes += sz; j++;
+    }
+    return J({ v: 4, r: out, next: j < x.sh.length ? j : null, total: total(x), at: x.at || 0, n: x.n || "", canEdit: can(me, db, "dmap", "update") });
   }
-  // Upload from a KML: {mode: "replace" | "add", first, last, total, n: file name, items: [{n, c, d, f, la, ln}]}. Sent in chunks (first = first chunk).
+  // Upload from a KML, sent in chunks of up to 1000 places: {mode: "replace" | "add", first, last, total, n: file name, items: [{n, c, d, f, la, ln}]}. Every chunk becomes one shard.
   if (a === "map_put") {
     if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to upload" }, 403);
-    const mode = b.mode === "replace" ? "replace" : "add", items = Array.isArray(b.items) ? b.items.slice(0, 500) : [];
-    let d = await loadPlaces(s), backedUp = false;
+    const mode = b.mode === "replace" ? "replace" : "add", items = Array.isArray(b.items) ? b.items.slice(0, SHARD_MAX) : [];
+    let x = await loadIdx(s), pk, backedUp = false;
     if (b.first) {
       backedUp = !!(await backup(s, (mode === "replace" ? "Before replacing the map (" : "Before adding to the map (") + me.u + ")"));   // the old list is kept so a wrong upload can be undone
-      if (mode === "replace") d = { n: clip(b.n, 120) || "upload", r: [], at: 0 }; else d.n = d.n || clip(b.n, 120);
+      if (mode === "replace") { x = emptyIdx(clip(b.n, 120) || "upload"); pk = []; } else x.n = x.n || clip(b.n, 120);
     }
-    const seen = new Set(d.r.map(pkey)); let saved = 0, dup = 0, invalid = 0;
+    pk = pk || await loadPk(s);
+    const seen = new Set(pk), sid = crypto.randomBytes(3).toString("hex"), arr = []; let dup = 0, invalid = 0;
     for (const it of items) {
-      const p = normPlace(it); if (!p) { invalid++; continue; }
-      if (seen.has(pkey(p))) { dup++; continue; }
-      if (d.r.length >= MAX_PLACES) return J({ e: "The map is limited to " + MAX_PLACES + " places" }, 400);
-      seen.add(pkey(p)); d.r.push(p); saved++;
+      const p = normPlace(it, sid); if (!p) { invalid++; continue; }
+      const h = hk(p); if (seen.has(h)) { dup++; continue; }
+      seen.add(h); pk.push(h); arr.push(p);
     }
-    await savePlaces(s, d);
-    if (b.last) await audit(s, me, mode === "replace" ? "upload kml (replace)" : "upload kml (add)", null, [["places", "", String(Number(b.total) || saved)], ["file", "", short(b.n)]]);
-    return J({ ok: 1, saved, dup, invalid, total: d.r.length, backedUp });
+    if (total(x) + arr.length > MAX_PLACES) return J({ e: "The map is limited to " + MAX_PLACES + " places" }, 400);
+    if (arr.length) { const k = newId(); await s.setJSON("ps-" + k, arr); x.sh.push({ i: sid, k, c: arr.length }); }
+    await s.setJSON("pkeys", pk); await saveIdx(s, x);
+    if (b.first && mode === "replace") await gc(s, x);
+    if (b.last) await audit(s, me, mode === "replace" ? "upload kml (replace)" : "upload kml (add)", null, [["places", "", String(Number(b.total) || arr.length)], ["file", "", short(b.n)]]);
+    return J({ ok: 1, saved: arr.length, dup, invalid, total: total(x), backedUp });
   }
-  // Move a pin ({id, la, ln}) or remove it (map_del {id}).
-  if (a === "map_move") {
-    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to move pins" }, 403);
-    const d = await loadPlaces(s), x = d.r.find(y => y.id === b.id); if (!x) return J({ e: "Place not found (it may have been removed)" }, 404);
-    const la = Number(b.la), ln = Number(b.ln); if (!okLL(la, ln)) return J({ e: "That is not a valid location" }, 400);
-    x.la = rnd(la); x.ln = rnd(ln); await savePlaces(s, d); await audit(s, me, "map pin moved", x, null); return J({ ok: 1, la: x.la, ln: x.ln });
-  }
-  if (a === "map_del") {
-    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to remove pins" }, 403);
-    const d = await loadPlaces(s), x = d.r.find(y => y.id === b.id); if (!x) return J({ e: "Place not found (it may have been removed)" }, 404);
-    d.r = d.r.filter(y => y !== x); await savePlaces(s, d); await audit(s, me, "map pin removed", x, null); return J({ ok: 1 });
+  // Move a pin ({id, la, ln}) or remove it (map_del {id}). Only the one shard that holds the place is rewritten.
+  if (a === "map_move" || a === "map_del") {
+    if (!can(me, db, "dmap", "update")) return J({ e: "You do not have permission to " + (a === "map_del" ? "remove" : "move") + " pins" }, 403);
+    const x = await loadIdx(s), e = x.sh.find(y => y.i === String(b.id || "").slice(0, 6)), arr = e ? await loadShard(s, e) : [], i = arr.findIndex(y => y.id === b.id);
+    if (i < 0) return J({ e: "Place not found (it may have been removed)" }, 404);
+    const p = arr[i], pk = await loadPk(s), h0 = hk(p), oldKey = e.k;
+    if (a === "map_move") {
+      const la = Number(b.la), ln = Number(b.ln); if (!okLL(la, ln)) return J({ e: "That is not a valid location" }, 400);
+      p.la = rnd(la); p.ln = rnd(ln); const j = pk.indexOf(h0); if (j >= 0) pk[j] = hk(p);
+    } else { arr.splice(i, 1); const j = pk.indexOf(h0); if (j >= 0) pk.splice(j, 1); }
+    if (arr.length) { e.k = newId(); e.c = arr.length; await s.setJSON("ps-" + e.k, arr); } else x.sh = x.sh.filter(y => y !== e);   // new file name: backups still point at the old one
+    await s.setJSON("pkeys", pk); await saveIdx(s, x); await gc(s, x);
+    await audit(s, me, a === "map_move" ? "map pin moved" : "map pin removed", p, null);
+    return a === "map_move" ? J({ ok: 1, la: p.la, ln: p.ln }) : J({ ok: 1 });
   }
   if (me.role !== "admin") return J({ e: "Admin only" }, 403);
   const pw = String(b.p || ""), u = String(b.u || "").trim().toLowerCase();
@@ -182,10 +211,11 @@ export default async (req) => {
   if (a === "backup_now") { const key = await backup(s, "Manual backup (" + me.u + ")"); return key ? J({ ok: 1 }) : J({ e: "Nothing to back up yet" }, 400); }
   if (a === "backup_restore") {
     const idx = (await s.get("backups_idx", { type: "json" })) || [], e = idx.find(y => y.key === b.key); if (!e) return J({ e: "Backup not found" }, 404);
-    const snap = await s.get(e.key, { type: "json" }); if (!snap || !Array.isArray(snap.r)) return J({ e: "That backup file is missing" }, 404);
+    const snap = await s.get(e.key, { type: "json" }); if (!snap || !Array.isArray(snap.sh)) return J({ e: "That backup file is missing" }, 404);
     await backup(s, "Before restoring a backup (" + me.u + ")");
-    await savePlaces(s, { n: snap.n || "restored", r: snap.r }); await audit(s, me, "restore backup", null, [["rows", "", String(snap.r.length)], ["from", "", new Date(e.t).toISOString().slice(0, 16)]]);
-    return J({ ok: 1, count: snap.r.length });
+    const x = { n: snap.n || "restored", at: 0, sh: snap.sh }; await s.setJSON("pkeys", snap.pk || []); await saveIdx(s, x); await gc(s, x);
+    await audit(s, me, "restore backup", null, [["places", "", String(total(x))], ["from", "", new Date(e.t).toISOString().slice(0, 16)]]);
+    return J({ ok: 1, count: total(x) });
   }
   if (a === "users") return J({ users: db.users.map(({ u, role }) => ({ u, role })), perms: db.perms });
   if (a === "adduser") {

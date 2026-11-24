@@ -12,7 +12,8 @@ Sign in as admin (or any user with **Edit**), click **Upload KML**, choose the `
 - Name = placemark name. Category = the KML folder it sits in (or the document name). Description and any extra data fields (My Maps columns) are shown in the pin's popup.
 - Only point placemarks are shown. Lines and areas in the file are skipped (the upload tells you how many).
 - You choose **Replace the map** (a backup is kept) or **Add to the map** (duplicates with the same name and location are skipped).
-- Up to 30,000 places. Users with Edit can also move or remove a single pin.
+- Built for big maps: up to 250,000 places (a 71,000-place map from ten My Maps files was tested). Upload the files **one at a time** and choose **Add to the map** for each after the first; a file with a few thousand places takes well under a minute. Users with Edit can also move or remove a single pin.
+- On phones a map with tens of thousands of pins is slower to open; pick an area in the category list to show just that area.
 - `sample-pins.kml` is a fake file for trying it out.
 
 ## Permissions (Admin page)
