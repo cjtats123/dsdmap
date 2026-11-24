@@ -8,11 +8,11 @@ A small GitHub + Netlify site with **one page: a map for every CEPALCO employee*
 - `index.html` only redirects to the map.
 
 ## Putting places on the map
-Sign in as admin (or any user with **Edit**), click **Upload KML**, choose the `.kml` or `.kmz` (Google Earth or Google My Maps export). Nothing has to be typed:
+Sign in as admin (or any user with **Edit**), click **Upload KML**, choose one or **several** `.kml` / `.kmz` files at once (hold Ctrl/Shift, or select all in the folder) (Google Earth or Google My Maps export). Nothing has to be typed:
 - Name = placemark name. Category = the KML folder it sits in (or the document name). Description and any extra data fields (My Maps columns) are shown in the pin's popup.
 - Only point placemarks are shown. Lines and areas in the file are skipped (the upload tells you how many).
 - You choose **Replace the map** (a backup is kept) or **Add to the map** (identical entries are skipped).
-- Built for big maps: up to 250,000 places (a 71,000-place map from ten My Maps files was tested). Upload the files **one at a time** and choose **Add to the map** for each after the first; a file with a few thousand places takes well under a minute. Users with Edit can also move or remove a single pin.
+- Built for big maps: up to 250,000 places (a 71,000-place map from ten My Maps files was tested). Select all your files in one go: they are combined and saved as one upload (one backup, duplicates across files skipped). A file that cannot be read is reported and left out. A few thousand places take well under a minute. Users with Edit can also move or remove a single pin.
 - On phones a map with tens of thousands of pins is slower to open; pick a category in the category list to show just that category.
 - `sample-pins.kml` is a fake file for trying it out.
 

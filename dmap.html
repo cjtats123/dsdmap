@@ -59,7 +59,7 @@
     <select id="ct"><option value="">All categories</option></select>
     <button class="btn" id="clr">Clear</button><button class="btn" id="fit">Fit all pins</button>
     <span class="grow" style="flex:1"></span>
-    <label class="btn btn-load" id="impl" hidden>Upload KML<input type="file" id="imp" hidden></label>
+    <label class="btn btn-load" id="impl" hidden>Upload KML<input type="file" id="imp" multiple accept=".kml,.kmz,.xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
     <button class="btn" id="exp" title="Download the places shown as a KML file for Google Earth / My Maps">Export KML</button>
     <span id="msg" class="font-semibold"></span>
   </div>
@@ -174,15 +174,20 @@ async function readKml(f){const n=f.name.toLowerCase(),head=n.endsWith('.kmz')?'
  if(zipped){await loadLib(ZIP);const z=await JSZip.loadAsync(await f.arrayBuffer()),k=Object.keys(z.files).find(x=>/\.kml$/i.test(x));if(!k)throw new Error('There is no KML inside that KMZ file');return kml(await z.files[k].async('string'))}
  if(n.endsWith('.kml')||n.endsWith('.xml')||/<kml|<Placemark|<\?xml/i.test(head))return kml(await f.text());
  throw new Error('Please choose a .kml or .kmz file')}
-$('#imp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
- try{flash('Reading '+f.name+'… (large files can take a moment)');const r=await readKml(f);
-  if(!r.items.length)return flash('No places (points) found in that file'+(r.skipped?' - it only has lines or areas':''),1);
-  if(r.items.length>250000)return flash('That file has '+r.items.length+' places; the limit is 250,000',1);
-  pending={items:r.items,name:f.name};const k=new Set(r.items.map(x=>canon(x.c)||UNC)).size;
-  $('#msg').textContent='';$('#up').hidden=false;$('#upt').textContent=f.name+': '+r.items.length.toLocaleString()+' places in '+k+' categor'+(k===1?'y':'ies');
-  $('#upn').textContent=(recs.length?'The map has '+recs.length.toLocaleString()+' places now. Replace removes them first (a backup is kept); Add keeps them and skips duplicates.':'Ready to put these places on the map.')+(r.skipped?' '+r.skipped+' line(s) / area(s) in the file are skipped (only points are shown).':'');
+$('#imp').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
+ try{const items=[],names=[],bad=[];let skipped=0;
+  for(let i=0;i<fs.length;i++){const f=fs[i];flash('Reading '+f.name+(fs.length>1?' ('+(i+1)+' of '+fs.length+')':'')+'… (large files can take a moment)');
+   try{const r=await readKml(f);if(!r.items.length){bad.push(f.name+' (no places)');continue}
+    for(const x of r.items)items.push(x);skipped+=r.skipped;names.push(f.name+' ('+r.items.length.toLocaleString()+')')}
+   catch(x){bad.push(f.name+' ('+(x.message||'could not be read')+')')}
+   await new Promise(r=>setTimeout(r,0))}
+  if(!items.length)return flash('No places (points) found'+(bad.length?': '+bad.join('; '):'')+(skipped?' - the files only have lines or areas':''),1);
+  if(items.length>250000)return flash('Those files have '+items.length.toLocaleString()+' places together; the limit is 250,000',1);
+  pending={items,name:fs.length>1?fs.length+' files: '+fs.map(f=>f.name).join(', '):fs[0].name};const k=new Set(items.map(x=>canon(x.c)||UNC)).size;
+  $('#msg').textContent='';$('#up').hidden=false;$('#upt').textContent=(names.length>1?names.length+' files: ':fs[0].name+': ')+items.length.toLocaleString()+' places in '+k+' categor'+(k===1?'y':'ies');
+  $('#upn').textContent=(names.length>1?'Files: '+names.join(', ')+'. ':'')+(bad.length?'Not used: '+bad.join('; ')+'. ':'')+(recs.length?'The map has '+recs.length.toLocaleString()+' places now. Replace removes them first (a backup is kept); Add keeps them and skips duplicates.':'Ready to put these places on the map.')+(skipped?' '+skipped+' line(s) / area(s) in the files are skipped (only points are shown).':'');
   $('#upr').textContent=recs.length?'Replace the map':'Upload';$('#upa').hidden=!recs.length}
- catch(x){flash(x.message||'Could not read the file',1)}};
+ catch(x){flash(x.message||'Could not read the files',1)}};
 async function doUpload(mode){if(!pending)return;const p=pending,B=[$('#upr'),$('#upa'),$('#upx')];B.forEach(b=>b.disabled=true);
  try{let saved=0,dup=0,bad=0;const N=500;
   for(let i=0;i<p.items.length;i+=N){$('#upn').textContent='Saving '+Math.min(i+N,p.items.length).toLocaleString()+' of '+p.items.length.toLocaleString()+'…';
