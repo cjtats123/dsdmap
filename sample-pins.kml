@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Sample pins (fake data - for testing Import pins)</name>
+    <Placemark>
+      <name>SAMPLE CUSTOMER ONE</name>
+      <description>Contract No: 100001</description>
+      <Point><coordinates>124.6460,8.4772,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Pin 2</name>
+      <ExtendedData>
+        <Data name="CONTRACT NO."><value>100002</value></Data>
+        <Data name="CUSTOMER NAME"><value>SAMPLE CUSTOMER TWO</value></Data>
+      </ExtendedData>
+      <Point><coordinates>124.6550,8.4830,0</coordinates></Point>
+    </Placemark>
+  </Document>
+</kml>
